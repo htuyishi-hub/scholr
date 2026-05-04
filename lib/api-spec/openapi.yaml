@@ -3,20 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Scholr — Scholarships & Opportunities Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: opportunities
+    description: Scholarship & opportunity listings
+  - name: users
+    description: Team member management
+  - name: settings
+    description: Site settings
+  - name: dashboard
+    description: Admin dashboard analytics
+  - name: upload
+    description: File uploads
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +36,530 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ──── AUTH ────────────────────────────────────────────────────────────────
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current user
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ──── OPPORTUNITIES ───────────────────────────────────────────────────────
+  /opportunities:
+    get:
+      operationId: listOpportunities
+      tags: [opportunities]
+      summary: List/search opportunities (public)
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 24
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Full-text search query
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: country
+          in: query
+          schema:
+            type: string
+        - name: fundingType
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [published, draft, archived]
+        - name: deadline
+          in: query
+          schema:
+            type: string
+            enum: [soon, this_month, open]
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [latest, deadline_soonest, most_viewed]
+            default: latest
+        - name: featured
+          in: query
+          schema:
+            type: boolean
+        - name: authorId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated opportunities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpportunitiesPage"
+
+    post:
+      operationId: createOpportunity
+      tags: [opportunities]
+      summary: Create a new opportunity (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOpportunityBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Opportunity"
+
+  /opportunities/featured:
+    get:
+      operationId: getFeaturedOpportunities
+      tags: [opportunities]
+      summary: Get featured/editor picks (public)
+      responses:
+        "200":
+          description: Featured opportunities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Opportunity"
+
+  /opportunities/stats:
+    get:
+      operationId: getOpportunitiesStats
+      tags: [opportunities]
+      summary: Get aggregate stats (total count, countries, categories)
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpportunitiesStats"
+
+  /opportunities/{id}:
+    get:
+      operationId: getOpportunity
+      tags: [opportunities]
+      summary: Get single opportunity by ID (public)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Opportunity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Opportunity"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updateOpportunity
+      tags: [opportunities]
+      summary: Update an opportunity (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOpportunityBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Opportunity"
+
+    delete:
+      operationId: deleteOpportunity
+      tags: [opportunities]
+      summary: Delete an opportunity (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /opportunities/slug/{slug}:
+    get:
+      operationId: getOpportunityBySlug
+      tags: [opportunities]
+      summary: Get opportunity by slug (public)
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Opportunity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Opportunity"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /opportunities/{id}/view:
+    post:
+      operationId: incrementOpportunityViews
+      tags: [opportunities]
+      summary: Increment view count
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: View counted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /opportunities/{id}/related:
+    get:
+      operationId: getRelatedOpportunities
+      tags: [opportunities]
+      summary: Get related opportunities by category/country
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Related opportunities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Opportunity"
+
+  /opportunities/bulk:
+    post:
+      operationId: bulkUpdateOpportunities
+      tags: [opportunities]
+      summary: Bulk update status or delete opportunities
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkUpdateBody"
+      responses:
+        "200":
+          description: Bulk updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ──── USERS / TEAM ────────────────────────────────────────────────────────
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List team members (admin)
+      responses:
+        "200":
+          description: Team members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Invite a new team member (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserBody"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get a team member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Update a team member (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Remove a team member (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ──── SETTINGS ────────────────────────────────────────────────────────────
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get site settings (admin)
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SiteSettings"
+
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update site settings (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SiteSettings"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SiteSettings"
+
+  # ──── DASHBOARD ───────────────────────────────────────────────────────────
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Admin dashboard stats (counts, trends)
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/activity:
+    get:
+      operationId: getDashboardActivity
+      tags: [dashboard]
+      summary: Recent activity feed
+      responses:
+        "200":
+          description: Activity items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /dashboard/top-posts:
+    get:
+      operationId: getTopPosts
+      tags: [dashboard]
+      summary: Top 5 most-viewed posts
+      responses:
+        "200":
+          description: Top posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Opportunity"
+
+  /dashboard/posts-by-month:
+    get:
+      operationId: getPostsByMonth
+      tags: [dashboard]
+      summary: Posts created per month (last 6 months)
+      responses:
+        "200":
+          description: Monthly counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MonthlyCount"
+
+  /dashboard/views-by-category:
+    get:
+      operationId: getViewsByCategory
+      tags: [dashboard]
+      summary: Total views grouped by category
+      responses:
+        "200":
+          description: Category views
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategoryViews"
+
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +567,416 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    # ── Auth ──────────────────────────────────────────────────────────────
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+      required: [user, token]
+
+    # ── User ──────────────────────────────────────────────────────────────
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, editor, viewer]
+        avatarUrl:
+          type: string
+          nullable: true
+        postsCount:
+          type: integer
+        lastActive:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, name, email, role, postsCount, createdAt]
+
+    CreateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        role:
+          type: string
+          enum: [admin, editor, viewer]
+      required: [name, email, password, role]
+
+    UpdateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, editor, viewer]
+        avatarUrl:
+          type: string
+          nullable: true
+
+    # ── Opportunity ───────────────────────────────────────────────────────
+    Opportunity:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        content:
+          type: string
+          nullable: true
+        coverImage:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        fundingType:
+          type: string
+          nullable: true
+        studyLevel:
+          type: array
+          items:
+            type: string
+          nullable: true
+        deadline:
+          type: string
+          nullable: true
+        amount:
+          type: string
+          nullable: true
+        applyLink:
+          type: string
+          nullable: true
+        whatsappNumber:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, archived]
+        featured:
+          type: boolean
+        pinned:
+          type: boolean
+        views:
+          type: integer
+        authorId:
+          type: string
+          nullable: true
+        author:
+          $ref: "#/components/schemas/User"
+          nullable: true
+        seoTitle:
+          type: string
+          nullable: true
+        metaDescription:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, title, slug, status, featured, pinned, views, createdAt, updatedAt]
+
+    CreateOpportunityBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        content:
+          type: string
+          nullable: true
+        coverImage:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        fundingType:
+          type: string
+          nullable: true
+        studyLevel:
+          type: array
+          items:
+            type: string
+          nullable: true
+        deadline:
+          type: string
+          nullable: true
+        amount:
+          type: string
+          nullable: true
+        applyLink:
+          type: string
+          nullable: true
+        whatsappNumber:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, archived]
+          default: draft
+        featured:
+          type: boolean
+          default: false
+        pinned:
+          type: boolean
+          default: false
+        seoTitle:
+          type: string
+          nullable: true
+        metaDescription:
+          type: string
+          nullable: true
+      required: [title]
+
+    UpdateOpportunityBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        content:
+          type: string
+          nullable: true
+        coverImage:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        fundingType:
+          type: string
+          nullable: true
+        studyLevel:
+          type: array
+          items:
+            type: string
+          nullable: true
+        deadline:
+          type: string
+          nullable: true
+        amount:
+          type: string
+          nullable: true
+        applyLink:
+          type: string
+          nullable: true
+        whatsappNumber:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, archived]
+        featured:
+          type: boolean
+        pinned:
+          type: boolean
+        seoTitle:
+          type: string
+          nullable: true
+        metaDescription:
+          type: string
+          nullable: true
+
+    BulkUpdateBody:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+        action:
+          type: string
+          enum: [publish, archive, delete]
+      required: [ids, action]
+
+    OpportunitiesPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Opportunity"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+      required: [items, total, page, limit, totalPages]
+
+    OpportunitiesStats:
+      type: object
+      properties:
+        totalOpportunities:
+          type: integer
+        totalCountries:
+          type: integer
+        updatedToday:
+          type: integer
+      required: [totalOpportunities, totalCountries, updatedToday]
+
+    # ── Settings ──────────────────────────────────────────────────────────
+    SiteSettings:
+      type: object
+      properties:
+        siteName:
+          type: string
+        siteTagline:
+          type: string
+        defaultWhatsappNumber:
+          type: string
+        contactEmail:
+          type: string
+        twitterUrl:
+          type: string
+        instagramUrl:
+          type: string
+        telegramUrl:
+          type: string
+        facebookUrl:
+          type: string
+        defaultMetaDescription:
+          type: string
+        googleAnalyticsId:
+          type: string
+        postsPerPage:
+          type: integer
+      required: [siteName]
+
+    # ── Dashboard ─────────────────────────────────────────────────────────
+    DashboardSummary:
+      type: object
+      properties:
+        totalPosts:
+          type: integer
+        publishedPosts:
+          type: integer
+        draftPosts:
+          type: integer
+        thisMonthPosts:
+          type: integer
+        totalViews:
+          type: integer
+        teamMembers:
+          type: integer
+      required: [totalPosts, publishedPosts, draftPosts, thisMonthPosts, totalViews, teamMembers]
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+        opportunityTitle:
+          type: string
+        authorName:
+          type: string
+        createdAt:
+          type: string
+      required: [id, action, opportunityTitle, authorName, createdAt]
+
+    MonthlyCount:
+      type: object
+      properties:
+        month:
+          type: string
+        count:
+          type: integer
+      required: [month, count]
+
+    CategoryViews:
+      type: object
+      properties:
+        category:
+          type: string
+        views:
+          type: integer
+      required: [category, views]
+
+    # ── Upload ────────────────────────────────────────────────────────────
+    UploadResponse:
+      type: object
+      properties:
+        url:
+          type: string
+      required: [url]
