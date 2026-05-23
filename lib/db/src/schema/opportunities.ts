@@ -62,6 +62,7 @@ export const opportunitiesTable = pgTable("opportunities", {
   referenceLetters: integer("reference_letters"),
   notificationDate: date("notification_date"),
   programDuration: text("program_duration"),
+  requiredDocuments: text("required_documents").array(),
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

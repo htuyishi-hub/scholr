@@ -283,6 +283,7 @@ router.post("/", async (req, res) => {
         seoTitle: body.seoTitle as string | null ?? null,
         metaDescription: body.metaDescription as string | null ?? null,
         authorId: authorId ?? null,
+        requiredDocuments: body.requiredDocuments as string[] | null ?? null,
       })
       .returning();
 
@@ -337,6 +338,7 @@ router.put("/:id", async (req, res) => {
         ...(body.pinned !== undefined && { pinned: Boolean(body.pinned) }),
         ...(body.seoTitle !== undefined && { seoTitle: body.seoTitle as string | null }),
         ...(body.metaDescription !== undefined && { metaDescription: body.metaDescription as string | null }),
+        ...(body.requiredDocuments !== undefined && { requiredDocuments: body.requiredDocuments as string[] | null }),
         updatedAt: new Date(),
       })
       .where(eq(opportunitiesTable.id, req.params.id))

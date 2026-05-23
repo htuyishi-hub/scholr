@@ -9,6 +9,7 @@ import uploadRouter from "./upload.js";
 import studentRouter from "./student.js";
 import applicationsRouter from "./applications.js";
 import aiRouter from "./ai.js";
+import storageRouter from "./storage.js";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use("/upload", uploadRouter);
 router.use("/student", studentRouter);
 router.use("/applications", applicationsRouter);
 router.use("/ai", aiRouter);
+router.use(storageRouter);
 
 export default router;

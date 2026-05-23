@@ -11,6 +11,16 @@ import { studentProfilesTable } from "./student-profiles";
 import { opportunitiesTable } from "./opportunities";
 import { usersTable } from "./users";
 
+export interface DocumentSlot {
+  type: string;
+  label: string;
+  required: boolean;
+  objectPath?: string | null;
+  fileName?: string | null;
+  uploadedAt?: string | null;
+  size?: number | null;
+}
+
 export const managedApplicationsTable = pgTable("managed_applications", {
   id: uuid("id").primaryKey().defaultRandom(),
   studentId: uuid("student_id")
@@ -41,7 +51,7 @@ export const managedApplicationsTable = pgTable("managed_applications", {
   assignedTo: uuid("assigned_to").references(() => usersTable.id, {
     onDelete: "set null",
   }),
-  documents: jsonb("documents").$type<string[]>().default([]),
+  documents: jsonb("documents").$type<DocumentSlot[]>().default([]),
   notes: text("notes"),
   timeline: jsonb("timeline").$type<{ date: string; event: string }[]>().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),

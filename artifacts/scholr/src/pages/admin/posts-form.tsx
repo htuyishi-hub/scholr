@@ -76,6 +76,7 @@ interface FormData {
   referenceLetters: string;
   notificationDate: string;
   programDuration: string;
+  requiredDocuments: string[];
 }
 
 const INITIAL_FORM: FormData = {
@@ -111,6 +112,7 @@ const INITIAL_FORM: FormData = {
   referenceLetters: "",
   notificationDate: "",
   programDuration: "",
+  requiredDocuments: [],
 };
 
 export function PostsForm({ id }: { id?: string }) {
@@ -207,6 +209,7 @@ export function PostsForm({ id }: { id?: string }) {
         referenceLetters: String(e.referenceLetters || ""),
         notificationDate: e.notificationDate ? String(e.notificationDate).slice(0, 10) : "",
         programDuration: String(e.programDuration || ""),
+        requiredDocuments: Array.isArray(e.requiredDocuments) ? (e.requiredDocuments as string[]) : [],
       });
       setSlugEdited(true);
     }
@@ -300,6 +303,7 @@ export function PostsForm({ id }: { id?: string }) {
     payload.renewable = form.renewable;
     payload.interviewRequired = form.interviewRequired;
     payload.essayRequired = form.essayRequired;
+    if (form.requiredDocuments.length > 0) payload.requiredDocuments = form.requiredDocuments;
 
     if (isEdit && id) {
       updateOpp.mutate(
@@ -774,6 +778,44 @@ export function PostsForm({ id }: { id?: string }) {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Required Documents (for Apply With Us)</Label>
+                  <p className="text-xs text-muted-foreground">Select which documents students must upload when applying through Scholr. Leave empty to use the default set.</p>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    {[
+                      { value: "cv", label: "CV / Resume" },
+                      { value: "transcript", label: "Academic Transcript" },
+                      { value: "passport", label: "Passport / National ID" },
+                      { value: "photo", label: "Passport-size Photo" },
+                      { value: "english_test", label: "English Test Score" },
+                      { value: "recommendation", label: "Reference Letter" },
+                      { value: "statement", label: "Personal Statement" },
+                      { value: "certificate", label: "Certificate / Award" },
+                    ].map(({ value, label }) => (
+                      <div key={value} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`doc-${value}`}
+                          checked={form.requiredDocuments.includes(value)}
+                          onChange={e => {
+                            setField(
+                              "requiredDocuments",
+                              e.target.checked
+                                ? [...form.requiredDocuments, value]
+                                : form.requiredDocuments.filter(d => d !== value)
+                            );
+                          }}
+                          className="w-4 h-4"
+                        />
+                        <label htmlFor={`doc-${value}`} className="text-sm">{label}</label>
+                      </div>
+                    ))}
+                  </div>
+                  {form.requiredDocuments.length > 0 && (
+                    <p className="text-xs text-primary mt-1">{form.requiredDocuments.length} document type{form.requiredDocuments.length > 1 ? "s" : ""} selected</p>
+                  )}
                 </div>
               </div>
             )}

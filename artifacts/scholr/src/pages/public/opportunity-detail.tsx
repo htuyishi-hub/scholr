@@ -521,6 +521,7 @@ export function OpportunityDetail({ slug }: { slug: string }) {
             slug: opp.slug,
             applyLink: opp.applyLink,
             deadline: opp.deadline,
+            requiredDocuments: (opp as Record<string, unknown>).requiredDocuments as string[] | null,
           }}
           onClose={() => setShowApplyModal(false)}
         />

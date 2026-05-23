@@ -7,9 +7,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ArrowLeft, User, Calendar, MapPin, GraduationCap, MessageCircle,
-  CheckCircle2, Clock, FileText, Loader2, Award, AlertCircle, Send
+  ArrowLeft, User, MessageCircle,
+  CheckCircle2, FileText, Loader2, Award, Download, File
 } from "lucide-react";
+
+interface DocumentSlot {
+  type: string;
+  label: string;
+  required: boolean;
+  objectPath?: string | null;
+  fileName?: string | null;
+  uploadedAt?: string | null;
+  size?: number | null;
+}
 
 interface ApplicationDetail {
   id: string;
@@ -21,7 +31,7 @@ interface ApplicationDetail {
   contactTime?: string | null;
   concerns?: string | null;
   notes?: string | null;
-  documents?: string[] | null;
+  documents?: DocumentSlot[] | null;
   timeline?: { date: string; event: string }[] | null;
   createdAt: string;
   updatedAt: string;
@@ -206,6 +216,55 @@ export function AdminApplicationDetail({ id }: { id: string }) {
                   <p className="text-sm leading-relaxed">{app.concerns}</p>
                 </div>
               )}
+            </section>
+          )}
+
+          {/* Documents */}
+          {app.documents && app.documents.length > 0 && (
+            <section className="bg-card border border-border rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText size={18} className="text-primary" />
+                <h2 className="font-semibold">Submitted Documents</h2>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {app.documents.filter((d) => d.objectPath).length}/{app.documents.length} uploaded
+                </span>
+              </div>
+              <div className="space-y-2">
+                {app.documents.map((doc, i) => (
+                  <div key={i} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                    doc.objectPath
+                      ? "border-emerald-500/30 bg-emerald-500/5"
+                      : doc.required
+                      ? "border-red-500/20 bg-red-500/5"
+                      : "border-border bg-muted/30"
+                  }`}>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${doc.objectPath ? "bg-emerald-500/20" : "bg-muted"}`}>
+                        {doc.objectPath
+                          ? <CheckCircle2 size={14} className="text-emerald-500" />
+                          : <File size={14} className="text-muted-foreground" />
+                        }
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{doc.label}</p>
+                        {doc.fileName && <p className="text-xs text-muted-foreground truncate">{doc.fileName}{doc.size ? ` · ${(doc.size / 1024).toFixed(0)} KB` : ""}</p>}
+                        {!doc.objectPath && <p className="text-xs text-muted-foreground">{doc.required ? "⚠ Not uploaded yet" : "Optional · not uploaded"}</p>}
+                      </div>
+                    </div>
+                    {doc.objectPath && (
+                      <a
+                        href={`${BASE}/api/storage${doc.objectPath}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0 ml-2 p-1.5 rounded-lg hover:bg-emerald-500/10 text-emerald-600 transition-colors"
+                        title="Download"
+                      >
+                        <Download size={14} />
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
             </section>
           )}
 
