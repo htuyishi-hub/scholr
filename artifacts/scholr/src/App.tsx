@@ -7,12 +7,17 @@ import NotFound from "@/pages/not-found";
 import { PublicLayout } from "@/components/layout/public-layout";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { AuthGuard } from "@/components/auth/auth-guard";
+import { StudentAuthProvider } from "@/hooks/use-student-auth";
 
-// Placeholders for pages that will be created next
 import { Home } from "@/pages/public/home";
 import { Browse } from "@/pages/public/browse";
 import { OpportunityDetail } from "@/pages/public/opportunity-detail";
 import { About } from "@/pages/public/about";
+import { StudentRegister } from "@/pages/public/student-register";
+import { StudentLogin } from "@/pages/public/student-login";
+import { StudentDashboard } from "@/pages/public/student-dashboard";
+import { StudentProfile } from "@/pages/public/student-profile";
+import { FindScholarship } from "@/pages/public/find-scholarship";
 
 import { Login } from "@/pages/admin/login";
 import { Dashboard } from "@/pages/admin/dashboard";
@@ -20,6 +25,8 @@ import { Posts } from "@/pages/admin/posts";
 import { PostsForm } from "@/pages/admin/posts-form";
 import { Team } from "@/pages/admin/team";
 import { Settings } from "@/pages/admin/settings";
+import { AdminApplications } from "@/pages/admin/applications";
+import { AdminApplicationDetail } from "@/pages/admin/application-detail";
 
 const queryClient = new QueryClient();
 
@@ -31,7 +38,7 @@ function Router() {
       <Route path="/admin">
         <Redirect to="/admin/dashboard" />
       </Route>
-      
+
       <Route path="/admin/dashboard">
         <AuthGuard>
           <AdminLayout>
@@ -39,7 +46,7 @@ function Router() {
           </AdminLayout>
         </AuthGuard>
       </Route>
-      
+
       <Route path="/admin/posts">
         <AuthGuard>
           <AdminLayout>
@@ -47,7 +54,7 @@ function Router() {
           </AdminLayout>
         </AuthGuard>
       </Route>
-      
+
       <Route path="/admin/posts/new">
         <AuthGuard>
           <AdminLayout>
@@ -55,7 +62,7 @@ function Router() {
           </AdminLayout>
         </AuthGuard>
       </Route>
-      
+
       <Route path="/admin/posts/:id/edit">
         {params => (
           <AuthGuard>
@@ -65,7 +72,25 @@ function Router() {
           </AuthGuard>
         )}
       </Route>
-      
+
+      <Route path="/admin/applications">
+        <AuthGuard>
+          <AdminLayout>
+            <AdminApplications />
+          </AdminLayout>
+        </AuthGuard>
+      </Route>
+
+      <Route path="/admin/applications/:id">
+        {params => (
+          <AuthGuard>
+            <AdminLayout>
+              <AdminApplicationDetail id={params.id} />
+            </AdminLayout>
+          </AuthGuard>
+        )}
+      </Route>
+
       <Route path="/admin/team">
         <AuthGuard>
           <AdminLayout>
@@ -73,7 +98,7 @@ function Router() {
           </AdminLayout>
         </AuthGuard>
       </Route>
-      
+
       <Route path="/admin/settings">
         <AuthGuard>
           <AdminLayout>
@@ -82,19 +107,50 @@ function Router() {
         </AuthGuard>
       </Route>
 
+      {/* Student Auth Routes */}
+      <Route path="/register">
+        <PublicLayout>
+          <StudentRegister />
+        </PublicLayout>
+      </Route>
+
+      <Route path="/login">
+        <PublicLayout>
+          <StudentLogin />
+        </PublicLayout>
+      </Route>
+
+      <Route path="/dashboard">
+        <PublicLayout>
+          <StudentDashboard />
+        </PublicLayout>
+      </Route>
+
+      <Route path="/profile">
+        <PublicLayout>
+          <StudentProfile />
+        </PublicLayout>
+      </Route>
+
+      <Route path="/find-my-scholarship">
+        <PublicLayout>
+          <FindScholarship />
+        </PublicLayout>
+      </Route>
+
       {/* Public Routes */}
       <Route path="/">
         <PublicLayout>
           <Home />
         </PublicLayout>
       </Route>
-      
+
       <Route path="/browse">
         <PublicLayout>
           <Browse />
         </PublicLayout>
       </Route>
-      
+
       <Route path="/opportunity/:slug">
         {params => (
           <PublicLayout>
@@ -102,7 +158,7 @@ function Router() {
           </PublicLayout>
         )}
       </Route>
-      
+
       <Route path="/about">
         <PublicLayout>
           <About />
@@ -118,10 +174,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
+        <StudentAuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </StudentAuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

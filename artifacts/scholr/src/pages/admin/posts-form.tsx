@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import {
   Save, ArrowLeft, Upload, X, Loader2, Eye, EyeOff,
-  Star, Pin, ExternalLink, MessageCircle,
+  Star, Pin, ExternalLink, MessageCircle, Sparkles, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,8 @@ import { useToast } from "@/hooks/use-toast";
 const CATEGORIES = ["Scholarships", "Fellowships", "Grants", "Internships", "Conferences", "Competitions"];
 const STUDY_LEVELS = ["undergraduate", "masters", "phd", "postdoc", "any"];
 const FUNDING_TYPES = ["full", "partial", "free"];
+const SMART_TAGS = ["Fast Response", "Open to All", "Women Only", "Highly Competitive", "No Essay Required", "STEM", "Africa Focus", "No Interview Required"];
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
 
 function generateSlug(title: string) {
   return title
@@ -54,9 +56,26 @@ interface FormData {
   applyLink: string;
   whatsappNumber: string;
   tags: string;
+  smartTags: string[];
   status: "published" | "draft" | "archived";
   featured: boolean;
   pinned: boolean;
+  // Eligibility
+  minGpa: string;
+  minEnglishIelts: string;
+  genderRestriction: string;
+  // Enrichment
+  hostOrganization: string;
+  hostWebsite: string;
+  scholarshipType: string;
+  renewable: boolean;
+  numberOfAwards: string;
+  applicationFee: string;
+  interviewRequired: boolean;
+  essayRequired: boolean;
+  referenceLetters: string;
+  notificationDate: string;
+  programDuration: string;
 }
 
 const INITIAL_FORM: FormData = {
@@ -74,9 +93,24 @@ const INITIAL_FORM: FormData = {
   applyLink: "",
   whatsappNumber: "",
   tags: "",
+  smartTags: [],
   status: "draft",
   featured: false,
   pinned: false,
+  minGpa: "",
+  minEnglishIelts: "",
+  genderRestriction: "",
+  hostOrganization: "",
+  hostWebsite: "",
+  scholarshipType: "",
+  renewable: false,
+  numberOfAwards: "",
+  applicationFee: "",
+  interviewRequired: false,
+  essayRequired: false,
+  referenceLetters: "",
+  notificationDate: "",
+  programDuration: "",
 };
 
 export function PostsForm({ id }: { id?: string }) {
@@ -88,6 +122,48 @@ export function PostsForm({ id }: { id?: string }) {
   const [slugEdited, setSlugEdited] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const handleAiGenerate = async () => {
+    if (!form.title) { toast({ title: "Add a title first", variant: "destructive" }); return; }
+    setAiGenerating(true);
+    try {
+      const token = localStorage.getItem("scholr_token");
+      const res = await fetch(`${BASE_URL}/api/ai/generate-description`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title,
+          country: form.country,
+          category: form.category,
+          fundingType: form.fundingType,
+          studyLevel: form.studyLevel,
+          amount: form.amount,
+          deadline: form.deadline,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error || "AI generation failed");
+      }
+      const data = await res.json() as { description: string; content: string };
+      if (data.description) setField("description", data.description);
+      if (data.content) setField("content", data.content);
+      toast({ title: "AI content generated!", description: "Review and edit before publishing." });
+    } catch (e: unknown) {
+      toast({ title: "AI Error", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const toggleSmartTag = (tag: string) => {
+    setForm(f => ({
+      ...f,
+      smartTags: f.smartTags.includes(tag) ? f.smartTags.filter(t => t !== tag) : [...f.smartTags, tag],
+    }));
+  };
 
   const { data: existing, isLoading: existingLoading } = useGetOpportunity(id!, {
     query: { enabled: isEdit } as any,
@@ -97,6 +173,7 @@ export function PostsForm({ id }: { id?: string }) {
 
   useEffect(() => {
     if (existing) {
+      const e = existing as Record<string, unknown>;
       setForm({
         title: existing.title || "",
         slug: existing.slug || "",
@@ -111,10 +188,25 @@ export function PostsForm({ id }: { id?: string }) {
         amount: existing.amount || "",
         applyLink: existing.applyLink || "",
         whatsappNumber: existing.whatsappNumber || "",
-        tags: (existing.tags || []).join(", "),
+        tags: (existing.tags || []).filter((t): t is string => typeof t === "string" && !["Fast Response","Open to All","Women Only","Highly Competitive","No Essay Required","STEM","Africa Focus","No Interview Required"].includes(t)).join(", "),
+        smartTags: (existing.tags || []).filter((t): t is string => ["Fast Response","Open to All","Women Only","Highly Competitive","No Essay Required","STEM","Africa Focus","No Interview Required"].includes(t as string)),
         status: (existing.status as any) || "draft",
         featured: existing.featured || false,
         pinned: existing.pinned || false,
+        minGpa: String(e.minGpa || ""),
+        minEnglishIelts: String(e.minEnglishIelts || ""),
+        genderRestriction: String(e.genderRestriction || ""),
+        hostOrganization: String(e.hostOrganization || ""),
+        hostWebsite: String(e.hostWebsite || ""),
+        scholarshipType: String(e.scholarshipType || ""),
+        renewable: Boolean(e.renewable),
+        numberOfAwards: String(e.numberOfAwards || ""),
+        applicationFee: String(e.applicationFee || ""),
+        interviewRequired: Boolean(e.interviewRequired),
+        essayRequired: Boolean(e.essayRequired),
+        referenceLetters: String(e.referenceLetters || ""),
+        notificationDate: e.notificationDate ? String(e.notificationDate).slice(0, 10) : "",
+        programDuration: String(e.programDuration || ""),
       });
       setSlugEdited(true);
     }
@@ -173,6 +265,8 @@ export function PostsForm({ id }: { id?: string }) {
       .map(t => t.trim())
       .filter(Boolean);
 
+    const allTags = [...tags, ...form.smartTags].filter(Boolean);
+
     const payload = {
       title: form.title,
       slug: form.slug,
@@ -187,11 +281,25 @@ export function PostsForm({ id }: { id?: string }) {
       amount: form.amount || undefined,
       applyLink: form.applyLink || undefined,
       whatsappNumber: form.whatsappNumber || undefined,
-      tags: tags.length ? tags : undefined,
+      tags: allTags.length ? allTags : undefined,
       status: (publish ? "published" : form.status) as "published" | "draft" | "archived",
       featured: form.featured,
       pinned: form.pinned,
-    };
+    } as Record<string, unknown>;
+
+    // Advanced fields — only include when set
+    if (form.hostOrganization) payload.hostOrganization = form.hostOrganization;
+    if (form.minGpa) payload.minGpa = form.minGpa;
+    if (form.minEnglishIelts) payload.minEnglishIelts = form.minEnglishIelts;
+    if (form.genderRestriction) payload.genderRestriction = form.genderRestriction;
+    if (form.numberOfAwards) payload.numberOfAwards = parseInt(form.numberOfAwards, 10);
+    if (form.applicationFee) payload.applicationFee = form.applicationFee;
+    if (form.programDuration) payload.programDuration = form.programDuration;
+    if (form.notificationDate) payload.notificationDate = form.notificationDate;
+    if (form.referenceLetters) payload.referenceLetters = parseInt(form.referenceLetters, 10);
+    payload.renewable = form.renewable;
+    payload.interviewRequired = form.interviewRequired;
+    payload.essayRequired = form.essayRequired;
 
     if (isEdit && id) {
       updateOpp.mutate(
@@ -349,7 +457,21 @@ export function PostsForm({ id }: { id?: string }) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Short Description</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="description">Short Description</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleAiGenerate}
+                  disabled={aiGenerating || !form.title}
+                  className="gap-1.5 text-xs h-7 text-primary hover:bg-primary/10"
+                  data-testid="button-ai-generate"
+                >
+                  {aiGenerating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                  {aiGenerating ? "Generating..." : "AI Generate"}
+                </Button>
+              </div>
               <Textarea
                 id="description"
                 placeholder="2–3 sentence summary for search results and cards..."
@@ -533,9 +655,26 @@ export function PostsForm({ id }: { id?: string }) {
             </div>
           </div>
 
-          {/* Tags */}
+          {/* Smart Tags */}
           <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
-            <Label className="text-base font-semibold">Tags</Label>
+            <Label className="text-base font-semibold">Smart Tags</Label>
+            <div className="flex flex-wrap gap-2">
+              {SMART_TAGS.map(tag => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => toggleSmartTag(tag)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${form.smartTags.includes(tag) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Regular Tags */}
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+            <Label className="text-base font-semibold">Custom Tags</Label>
             <Input
               placeholder="cambridge, fully-funded, phd..."
               value={form.tags}
@@ -544,11 +683,98 @@ export function PostsForm({ id }: { id?: string }) {
               data-testid="input-tags"
             />
             <p className="text-xs text-muted-foreground">Comma-separated list of tags.</p>
-            {form.tags && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {form.tags.split(",").filter(Boolean).map((tag, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs capitalize">#{tag.trim()}</Badge>
-                ))}
+          </div>
+
+          {/* Advanced Details */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden">
+            <button
+              type="button"
+              className="w-full flex items-center justify-between p-6 hover:bg-muted/30 transition-colors"
+              onClick={() => setShowAdvanced(v => !v)}
+            >
+              <Label className="text-base font-semibold cursor-pointer">Advanced Details</Label>
+              {showAdvanced ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
+            </button>
+
+            {showAdvanced && (
+              <div className="px-6 pb-6 space-y-4 border-t border-border pt-5">
+                <p className="text-xs text-muted-foreground">Used for eligibility matching and student profiles</p>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Host Organization</Label>
+                  <Input placeholder="e.g. Gates Cambridge Trust" value={form.hostOrganization} onChange={e => setField("hostOrganization", e.target.value)} className="rounded-xl" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Min GPA Required</Label>
+                    <Input type="number" step="0.1" min="0" max="4" placeholder="e.g. 3.5" value={form.minGpa} onChange={e => setField("minGpa", e.target.value)} className="rounded-xl" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Min IELTS Score</Label>
+                    <Input type="number" step="0.5" min="0" max="9" placeholder="e.g. 6.5" value={form.minEnglishIelts} onChange={e => setField("minEnglishIelts", e.target.value)} className="rounded-xl" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Gender Restriction</Label>
+                  <Select value={form.genderRestriction || "none"} onValueChange={v => setField("genderRestriction", v === "none" ? "" : v)}>
+                    <SelectTrigger className="rounded-xl"><SelectValue placeholder="No restriction" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No restriction</SelectItem>
+                      <SelectItem value="women">Women only</SelectItem>
+                      <SelectItem value="men">Men only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Number of Awards</Label>
+                    <Input type="number" min="1" placeholder="e.g. 50" value={form.numberOfAwards} onChange={e => setField("numberOfAwards", e.target.value)} className="rounded-xl" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Application Fee (USD)</Label>
+                    <Input placeholder="0 = free" value={form.applicationFee} onChange={e => setField("applicationFee", e.target.value)} className="rounded-xl" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Program Duration</Label>
+                  <Input placeholder="e.g. 12 months, 4 years" value={form.programDuration} onChange={e => setField("programDuration", e.target.value)} className="rounded-xl" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Notification Date</Label>
+                  <Input type="date" value={form.notificationDate} onChange={e => setField("notificationDate", e.target.value)} className="rounded-xl" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Reference Letters Required</Label>
+                  <Input type="number" min="0" max="5" placeholder="e.g. 2" value={form.referenceLetters} onChange={e => setField("referenceLetters", e.target.value)} className="rounded-xl" />
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-xs text-muted-foreground">Requirements</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { key: "essayRequired", label: "Essay Required" },
+                      { key: "interviewRequired", label: "Interview Required" },
+                      { key: "renewable", label: "Renewable" },
+                    ].map(({ key, label }) => (
+                      <div key={key} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={key}
+                          checked={form[key as keyof FormData] as boolean}
+                          onChange={e => setField(key as keyof FormData, e.target.checked as any)}
+                          className="w-4 h-4"
+                        />
+                        <label htmlFor={key} className="text-sm">{label}</label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>

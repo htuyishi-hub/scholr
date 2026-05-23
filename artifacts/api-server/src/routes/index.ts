@@ -6,6 +6,9 @@ import usersRouter from "./users.js";
 import settingsRouter from "./settings.js";
 import dashboardRouter from "./dashboard.js";
 import uploadRouter from "./upload.js";
+import studentRouter from "./student.js";
+import applicationsRouter from "./applications.js";
+import aiRouter from "./ai.js";
 
 const router: IRouter = Router();
 
@@ -16,5 +19,8 @@ router.use("/users", usersRouter);
 router.use("/settings", settingsRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/upload", uploadRouter);
+router.use("/student", studentRouter);
+router.use("/applications", applicationsRouter);
+router.use("/ai", aiRouter);
 
 export default router;

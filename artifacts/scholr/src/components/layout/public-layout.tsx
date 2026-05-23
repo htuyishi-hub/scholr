@@ -1,13 +1,15 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Compass, Search, Info, MessageCircle, Menu, X, ArrowRight } from "lucide-react";
+import { Compass, Search, Info, MessageCircle, Menu, X, ArrowRight, User, GraduationCap, LogOut } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { useStudent } from "@/hooks/use-student-auth";
 
 export function PublicLayout({ children }: { children: ReactNode }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
+  const { student, logout } = useStudent();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -20,10 +22,13 @@ export function PublicLayout({ children }: { children: ReactNode }) {
   // Force dark mode on document element
   useEffect(() => {
     document.documentElement.classList.add("dark");
-    return () => {
-      // Don't remove it so we don't break admin if they leave public? Admin forces light.
-    };
+    return () => {};
   }, []);
+
+  const handleLogout = async () => {
+    await logout();
+    setMobileMenuOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary selection:text-primary-foreground">
@@ -40,7 +45,7 @@ export function PublicLayout({ children }: { children: ReactNode }) {
             <span className="font-serif font-bold text-2xl tracking-tight">scholr.</span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden md:flex items-center gap-6">
             <Link
               href="/browse"
               className={`text-sm font-medium transition-colors hover:text-primary ${
@@ -50,6 +55,14 @@ export function PublicLayout({ children }: { children: ReactNode }) {
               Browse
             </Link>
             <Link
+              href="/find-my-scholarship"
+              className={`text-sm font-medium transition-colors hover:text-primary ${
+                location.startsWith("/find-my-scholarship") ? "text-primary" : "text-muted-foreground"
+              }`}
+            >
+              Find My Match
+            </Link>
+            <Link
               href="/about"
               className={`text-sm font-medium transition-colors hover:text-primary ${
                 location.startsWith("/about") ? "text-primary" : "text-muted-foreground"
@@ -57,9 +70,28 @@ export function PublicLayout({ children }: { children: ReactNode }) {
             >
               About
             </Link>
-            <Button asChild variant="default" className="rounded-full font-semibold">
-              <Link href="/admin/login">Submit Opportunity</Link>
-            </Button>
+
+            {student ? (
+              <div className="flex items-center gap-3">
+                <Button asChild variant="ghost" size="sm" className="gap-2">
+                  <Link href="/dashboard">
+                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
+                      {student.name.charAt(0).toUpperCase()}
+                    </div>
+                    {student.name.split(" ")[0]}
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/login">Sign In</Link>
+                </Button>
+                <Button asChild size="sm" className="rounded-full font-semibold">
+                  <Link href="/register">Get Started</Link>
+                </Button>
+              </div>
+            )}
           </nav>
 
           <button
@@ -72,24 +104,38 @@ export function PublicLayout({ children }: { children: ReactNode }) {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden absolute top-full left-0 right-0 bg-card border-b border-border shadow-lg py-4 px-4 flex flex-col gap-4">
-            <Link
-              href="/browse"
-              className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted"
-              onClick={() => setMobileMenuOpen(false)}
-            >
+          <div className="md:hidden absolute top-full left-0 right-0 bg-card border-b border-border shadow-lg py-4 px-4 flex flex-col gap-2">
+            <Link href="/browse" className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted" onClick={() => setMobileMenuOpen(false)}>
               Browse Opportunities
             </Link>
-            <Link
-              href="/about"
-              className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted"
-              onClick={() => setMobileMenuOpen(false)}
-            >
+            <Link href="/find-my-scholarship" className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted" onClick={() => setMobileMenuOpen(false)}>
+              Find My Match
+            </Link>
+            <Link href="/about" className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted" onClick={() => setMobileMenuOpen(false)}>
               About Us
             </Link>
-            <Button asChild className="w-full mt-2" onClick={() => setMobileMenuOpen(false)}>
-              <Link href="/admin/login">Submit Opportunity</Link>
-            </Button>
+            {student ? (
+              <>
+                <Link href="/dashboard" className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
+                  <User size={16} /> My Dashboard
+                </Link>
+                <Link href="/profile" className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
+                  <GraduationCap size={16} /> My Profile
+                </Link>
+                <button onClick={handleLogout} className="text-left text-base font-medium py-2 px-4 rounded-md hover:bg-muted text-muted-foreground flex items-center gap-2">
+                  <LogOut size={16} /> Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted" onClick={() => setMobileMenuOpen(false)}>
+                  Sign In
+                </Link>
+                <Button asChild className="w-full mt-2" onClick={() => setMobileMenuOpen(false)}>
+                  <Link href="/register">Get Started Free</Link>
+                </Button>
+              </>
+            )}
           </div>
         )}
       </header>
@@ -114,8 +160,8 @@ export function PublicLayout({ children }: { children: ReactNode }) {
               <h4 className="font-serif font-semibold text-lg mb-4">Platform</h4>
               <ul className="space-y-3">
                 <li><Link href="/browse" className="text-muted-foreground hover:text-primary text-sm transition-colors">All Opportunities</Link></li>
-                <li><Link href="/browse?category=Scholarships" className="text-muted-foreground hover:text-primary text-sm transition-colors">Scholarships</Link></li>
-                <li><Link href="/browse?category=Fellowships" className="text-muted-foreground hover:text-primary text-sm transition-colors">Fellowships</Link></li>
+                <li><Link href="/find-my-scholarship" className="text-muted-foreground hover:text-primary text-sm transition-colors">Find My Match</Link></li>
+                <li><Link href="/register" className="text-muted-foreground hover:text-primary text-sm transition-colors">Create Account</Link></li>
               </ul>
             </div>
             <div>
@@ -137,7 +183,7 @@ export function PublicLayout({ children }: { children: ReactNode }) {
         </div>
       </footer>
 
-      {/* Floating Action Button */}
+      {/* Floating WhatsApp Button */}
       <a
         href="https://wa.me/1234567890?text=Hi%20scholr!"
         target="_blank"

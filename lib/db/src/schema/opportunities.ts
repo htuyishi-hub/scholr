@@ -6,6 +6,7 @@ import {
   boolean,
   integer,
   date,
+  numeric,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -38,6 +39,30 @@ export const opportunitiesTable = pgTable("opportunities", {
   }),
   seoTitle: text("seo_title"),
   metaDescription: text("meta_description"),
+
+  // Eligibility fields (Part 1B)
+  minGpa: numeric("min_gpa", { precision: 3, scale: 2 }),
+  eligibleCountries: text("eligible_countries").array(),
+  ineligibleCountries: text("ineligible_countries").array(),
+  requiredField: text("required_field").array(),
+  minEnglishIelts: numeric("min_english_ielts", { precision: 3, scale: 1 }),
+  ageMin: integer("age_min"),
+  ageMax: integer("age_max"),
+  genderRestriction: text("gender_restriction"),
+
+  // Enrichment fields (Part 6A)
+  hostOrganization: text("host_organization"),
+  hostWebsite: text("host_website"),
+  scholarshipType: text("scholarship_type"),
+  renewable: boolean("renewable"),
+  numberOfAwards: integer("number_of_awards"),
+  applicationFee: numeric("application_fee", { precision: 10, scale: 2 }),
+  interviewRequired: boolean("interview_required"),
+  essayRequired: boolean("essay_required"),
+  referenceLetters: integer("reference_letters"),
+  notificationDate: date("notification_date"),
+  programDuration: text("program_duration"),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

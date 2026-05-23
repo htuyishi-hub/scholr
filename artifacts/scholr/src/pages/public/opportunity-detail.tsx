@@ -3,12 +3,15 @@ import { Link } from "wouter";
 import {
   ChevronRight, Calendar, Eye, Share2, ExternalLink, MessageCircle,
   MapPin, BookOpen, DollarSign, GraduationCap, Building, ArrowLeft,
+  CheckCircle2, AlertCircle, HelpCircle, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { OpportunityCard } from "@/components/opportunity-card";
+import { ApplyWithUsModal } from "@/components/apply-with-us-modal";
+import { useStudent } from "@/hooks/use-student-auth";
 import {
   useGetOpportunityBySlug,
   useIncrementOpportunityViews,
@@ -58,7 +61,121 @@ function CountdownTimer({ deadline }: { deadline: string }) {
   );
 }
 
+function EligibilityPanel({ opp, student }: { opp: Record<string, unknown>; student: { gpa?: string | null; nationality?: string | null; educationLevel?: string | null; ieltsScore?: string | null } | null }) {
+  if (!student) return null;
+
+  const checks: { label: string; status: "pass" | "fail" | "unknown"; detail: string }[] = [];
+
+  // GPA check
+  const minGpa = parseFloat((opp.minGpa as string) || "0");
+  const userGpa = parseFloat(student.gpa || "0");
+  if (minGpa > 0) {
+    if (!student.gpa) {
+      checks.push({ label: "GPA", status: "unknown", detail: `Min ${minGpa} required — not on your profile` });
+    } else {
+      checks.push({ label: "GPA", status: userGpa >= minGpa ? "pass" : "fail", detail: `Yours ${student.gpa} — Minimum: ${minGpa}` });
+    }
+  }
+
+  // Country check
+  const eligibleCountries = (opp.eligibleCountries as string[]) || [];
+  const ineligibleCountries = (opp.ineligibleCountries as string[]) || [];
+  if (eligibleCountries.length > 0 && student.nationality) {
+    checks.push({
+      label: "Country",
+      status: eligibleCountries.includes(student.nationality) ? "pass" : "fail",
+      detail: `${student.nationality} — ${eligibleCountries.includes(student.nationality) ? "eligible" : "not in eligible list"}`,
+    });
+  } else if (ineligibleCountries.length > 0 && student.nationality) {
+    checks.push({
+      label: "Country",
+      status: ineligibleCountries.includes(student.nationality) ? "fail" : "pass",
+      detail: `${student.nationality} — ${ineligibleCountries.includes(student.nationality) ? "ineligible" : "eligible"}`,
+    });
+  }
+
+  // Education level check
+  const requiredLevel = (opp.studyLevel as string[]) || [];
+  if (requiredLevel.length > 0 && student.educationLevel) {
+    const levelMap: Record<string, string[]> = {
+      "High School": ["undergraduate"],
+      "Bachelor's": ["masters", "undergraduate"],
+      "Master's": ["phd", "masters"],
+      "PhD": ["phd"],
+    };
+    const userLevels = levelMap[student.educationLevel] || [];
+    const matches = requiredLevel.some((l) => userLevels.includes(l));
+    checks.push({ label: "Education", status: matches ? "pass" : "fail", detail: `You have ${student.educationLevel} — Required: ${requiredLevel.join(", ")}` });
+  }
+
+  // English check
+  const minIelts = parseFloat((opp.minEnglishIelts as string) || "0");
+  if (minIelts > 0) {
+    if (!student.ieltsScore) {
+      checks.push({ label: "English", status: "unknown", detail: `IELTS ${minIelts} required — not on your profile` });
+    } else {
+      const userIelts = parseFloat(student.ieltsScore);
+      checks.push({ label: "English", status: userIelts >= minIelts ? "pass" : "fail", detail: `Your IELTS ${student.ieltsScore} — Required: ${minIelts}` });
+    }
+  }
+
+  if (checks.length === 0) return null;
+
+  const passes = checks.filter((c) => c.status === "pass").length;
+  const fails = checks.filter((c) => c.status === "fail").length;
+  const unknowns = checks.filter((c) => c.status === "unknown").length;
+
+  let overallScore = 0;
+  if (checks.length > 0) {
+    overallScore = Math.round((passes / checks.length) * 100);
+  }
+
+  const overallLabel = fails > 0 ? "Check Requirements" : unknowns > 0 ? "Likely Eligible" : "You Qualify";
+  const overallColor = fails > 0 ? "text-red-400" : unknowns > 0 ? "text-yellow-400" : "text-emerald-400";
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-serif font-bold text-lg">Your Eligibility</h3>
+        <span className={`text-sm font-bold ${overallColor}`}>{overallLabel}</span>
+      </div>
+
+      {/* Score bar */}
+      <div className="mb-4">
+        <div className="flex justify-between text-xs text-muted-foreground mb-1">
+          <span>Match score</span>
+          <span>{overallScore}%</span>
+        </div>
+        <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${overallScore}%` }} />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {checks.map((check, i) => (
+          <div key={i} className="flex items-start gap-2 text-sm">
+            {check.status === "pass" && <CheckCircle2 size={15} className="text-emerald-400 mt-0.5 flex-shrink-0" />}
+            {check.status === "fail" && <AlertCircle size={15} className="text-red-400 mt-0.5 flex-shrink-0" />}
+            {check.status === "unknown" && <HelpCircle size={15} className="text-yellow-400 mt-0.5 flex-shrink-0" />}
+            <div>
+              <span className="font-medium">{check.label}: </span>
+              <span className="text-muted-foreground">{check.detail}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {unknowns > 0 && (
+        <Button asChild variant="outline" size="sm" className="w-full mt-4 gap-2">
+          <Link href="/profile">Complete your profile →</Link>
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function OpportunityDetail({ slug }: { slug: string }) {
+  const { student } = useStudent();
   const { data: opp, isLoading } = useGetOpportunityBySlug(slug, {
     query: { enabled: !!slug } as any
   });
@@ -66,6 +183,7 @@ export function OpportunityDetail({ slug }: { slug: string }) {
   const { data: related } = useGetRelatedOpportunities(opp?.id || "", {
     query: { enabled: !!opp?.id } as any
   });
+  const [showApplyModal, setShowApplyModal] = useState(false);
 
   useEffect(() => {
     if (opp?.id) {
@@ -226,11 +344,30 @@ export function OpportunityDetail({ slug }: { slug: string }) {
               </div>
             )}
 
-            {opp.applyLink && (
-              <Button asChild size="lg" className="w-full font-bold gap-2 rounded-xl" disabled={!!isExpired} data-testid="button-apply-now">
-                <a href={opp.applyLink} target="_blank" rel="noopener noreferrer">
-                  Apply Now <ExternalLink size={15} />
-                </a>
+            {/* Apply With Us / Apply Directly */}
+            {!isExpired && (
+              <div className="space-y-3">
+                <Button
+                  size="lg"
+                  className="w-full font-bold gap-2 rounded-xl"
+                  onClick={() => setShowApplyModal(true)}
+                  data-testid="button-apply-now"
+                >
+                  <GraduationCap size={15} />
+                  Apply With Us
+                </Button>
+                {opp.applyLink && (
+                  <Button asChild size="sm" variant="outline" className="w-full rounded-xl gap-2 text-muted-foreground">
+                    <a href={opp.applyLink} target="_blank" rel="noopener noreferrer">
+                      Apply Directly <ExternalLink size={13} />
+                    </a>
+                  </Button>
+                )}
+              </div>
+            )}
+            {isExpired && opp.applyLink && (
+              <Button asChild size="lg" variant="outline" className="w-full font-bold gap-2 rounded-xl opacity-50" disabled>
+                <a href="#">Deadline Passed</a>
               </Button>
             )}
 
@@ -240,7 +377,21 @@ export function OpportunityDetail({ slug }: { slug: string }) {
                 Need Help? Chat on WhatsApp
               </a>
             </Button>
+
+            {!student && (
+              <p className="text-center text-xs text-muted-foreground">
+                <Link href="/login" className="text-primary hover:underline">Sign in</Link> to see your eligibility
+              </p>
+            )}
           </div>
+
+          {/* Eligibility Panel */}
+          {student && (
+            <EligibilityPanel
+              opp={opp as Record<string, unknown>}
+              student={student}
+            />
+          )}
 
           {/* Quick Facts */}
           <div className="bg-card border border-border rounded-2xl p-6" data-testid="sidebar-quick-facts">
@@ -279,6 +430,28 @@ export function OpportunityDetail({ slug }: { slug: string }) {
                   </div>
                 </div>
               )}
+              {(opp as Record<string, unknown>).hostOrganization && (
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                    <Building size={14} className="text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Host Organization</div>
+                    <div className="font-medium">{(opp as Record<string, unknown>).hostOrganization as string}</div>
+                  </div>
+                </div>
+              )}
+              {(opp as Record<string, unknown>).numberOfAwards && (
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                    <Users size={14} className="text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Awards</div>
+                    <div className="font-medium">{String((opp as Record<string, unknown>).numberOfAwards)} positions</div>
+                  </div>
+                </div>
+              )}
               {opp.category && (
                 <div className="flex items-center gap-3 text-sm">
                   <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
@@ -290,6 +463,13 @@ export function OpportunityDetail({ slug }: { slug: string }) {
                   </div>
                 </div>
               )}
+              {/* Boolean quick facts */}
+              <div className="pt-2 border-t border-border flex flex-wrap gap-2">
+                {(opp as Record<string, unknown>).essayRequired === false && <Badge variant="outline" className="text-xs">📋 No Essay</Badge>}
+                {(opp as Record<string, unknown>).interviewRequired === false && <Badge variant="outline" className="text-xs">No Interview</Badge>}
+                {(opp as Record<string, unknown>).renewable === true && <Badge variant="outline" className="text-xs">♻️ Renewable</Badge>}
+                {(opp as Record<string, unknown>).applicationFee === "0" || (opp as Record<string, unknown>).applicationFee === null ? null : null}
+              </div>
             </div>
           </div>
 
@@ -331,6 +511,20 @@ export function OpportunityDetail({ slug }: { slug: string }) {
           <Link href="/browse"><ArrowLeft size={16} /> Back to Browse</Link>
         </Button>
       </div>
+
+      {/* Apply With Us Modal */}
+      {showApplyModal && (
+        <ApplyWithUsModal
+          opportunity={{
+            id: opp.id,
+            title: opp.title,
+            slug: opp.slug,
+            applyLink: opp.applyLink,
+            deadline: opp.deadline,
+          }}
+          onClose={() => setShowApplyModal(false)}
+        />
+      )}
     </div>
   );
 }
