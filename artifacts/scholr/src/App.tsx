@@ -8,6 +8,7 @@ import { PublicLayout } from "@/components/layout/public-layout";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { StudentAuthProvider } from "@/hooks/use-student-auth";
+import { Auth0Provider } from "@/components/auth/auth0-provider";
 
 import { Home } from "@/pages/public/home";
 import { Browse } from "@/pages/public/browse";
@@ -19,6 +20,7 @@ import { StudentDashboard } from "@/pages/public/student-dashboard";
 import { StudentProfile } from "@/pages/public/student-profile";
 import { FindScholarship } from "@/pages/public/find-scholarship";
 import { Jobs } from "@/pages/public/jobs";
+import { Auth0Callback } from "@/pages/public/auth0-callback";
 
 import { Login } from "@/pages/admin/login";
 import { Dashboard } from "@/pages/admin/dashboard";
@@ -45,64 +47,52 @@ function Router() {
       <Route path="/admin/dashboard">
         <AuthGuard><AdminLayout><Dashboard /></AdminLayout></AuthGuard>
       </Route>
-
       <Route path="/admin/posts">
         <AuthGuard><AdminLayout><Posts /></AdminLayout></AuthGuard>
       </Route>
-
       <Route path="/admin/posts/new">
         <AuthGuard><AdminLayout><PostsForm /></AdminLayout></AuthGuard>
       </Route>
-
       <Route path="/admin/posts/:id/edit">
-        {params => (
-          <AuthGuard><AdminLayout><PostsForm id={params.id} /></AdminLayout></AuthGuard>
-        )}
+        {params => <AuthGuard><AdminLayout><PostsForm id={params.id} /></AdminLayout></AuthGuard>}
       </Route>
-
       <Route path="/admin/applications">
         <AuthGuard><AdminLayout><AdminApplications /></AdminLayout></AuthGuard>
       </Route>
-
       <Route path="/admin/applications/:id">
-        {params => (
-          <AuthGuard><AdminLayout><AdminApplicationDetail id={params.id} /></AdminLayout></AuthGuard>
-        )}
+        {params => <AuthGuard><AdminLayout><AdminApplicationDetail id={params.id} /></AdminLayout></AuthGuard>}
       </Route>
-
       <Route path="/admin/jobs">
         <AuthGuard><AdminLayout><JobsPanel /></AdminLayout></AuthGuard>
       </Route>
-
       <Route path="/admin/scraper">
         <AuthGuard><AdminLayout><ScraperPanel /></AdminLayout></AuthGuard>
       </Route>
-
       <Route path="/admin/team">
         <AuthGuard><AdminLayout><Team /></AdminLayout></AuthGuard>
       </Route>
-
       <Route path="/admin/settings">
         <AuthGuard><AdminLayout><Settings /></AdminLayout></AuthGuard>
+      </Route>
+
+      {/* Auth0 Callback */}
+      <Route path="/callback">
+        <PublicLayout><Auth0Callback /></PublicLayout>
       </Route>
 
       {/* Student Auth Routes */}
       <Route path="/register">
         <PublicLayout><StudentRegister /></PublicLayout>
       </Route>
-
       <Route path="/login">
         <PublicLayout><StudentLogin /></PublicLayout>
       </Route>
-
       <Route path="/dashboard">
         <PublicLayout><StudentDashboard /></PublicLayout>
       </Route>
-
       <Route path="/profile">
         <PublicLayout><StudentProfile /></PublicLayout>
       </Route>
-
       <Route path="/find-my-scholarship">
         <PublicLayout><FindScholarship /></PublicLayout>
       </Route>
@@ -111,21 +101,15 @@ function Router() {
       <Route path="/">
         <PublicLayout><Home /></PublicLayout>
       </Route>
-
       <Route path="/browse">
         <PublicLayout><Browse /></PublicLayout>
       </Route>
-
       <Route path="/jobs">
         <PublicLayout><Jobs /></PublicLayout>
       </Route>
-
       <Route path="/opportunity/:slug">
-        {params => (
-          <PublicLayout><OpportunityDetail slug={params.slug} /></PublicLayout>
-        )}
+        {params => <PublicLayout><OpportunityDetail slug={params.slug} /></PublicLayout>}
       </Route>
-
       <Route path="/about">
         <PublicLayout><About /></PublicLayout>
       </Route>
@@ -137,16 +121,18 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <StudentAuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </StudentAuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <Auth0Provider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <StudentAuthProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </StudentAuthProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </Auth0Provider>
   );
 }
 

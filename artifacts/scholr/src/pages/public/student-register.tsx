@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { studentRegister } from "@/hooks/use-student-auth";
 import { useStudent } from "@/hooks/use-student-auth";
 import { Loader2, CheckCircle2, ChevronRight, GraduationCap } from "lucide-react";
+import { Auth0Button } from "@/components/auth/auth0-button";
 
 const STEPS = ["Account", "Background", "Education", "Goals", "Language"];
 const COUNTRIES = ["Afghanistan","Albania","Algeria","Angola","Argentina","Australia","Austria","Bangladesh","Belgium","Bolivia","Brazil","Cambodia","Cameroon","Canada","Chile","China","Colombia","Congo","Cuba","Denmark","Ecuador","Egypt","Ethiopia","Finland","France","Germany","Ghana","Greece","Guatemala","Haiti","Honduras","Hungary","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Korea","Kuwait","Lebanon","Libya","Malaysia","Mexico","Morocco","Mozambique","Myanmar","Nepal","Netherlands","New Zealand","Nicaragua","Nigeria","Norway","Pakistan","Palestine","Peru","Philippines","Poland","Portugal","Romania","Russia","Rwanda","Saudi Arabia","Senegal","Sierra Leone","Somalia","South Africa","Spain","Sri Lanka","Sudan","Sweden","Switzerland","Syria","Taiwan","Tanzania","Thailand","Tunisia","Turkey","Uganda","Ukraine","United Kingdom","United States","Uruguay","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe","Other"];
@@ -53,7 +54,6 @@ export function StudentRegister() {
     try {
       const student = await studentRegister(form.name, form.email, form.password);
       setStudent(student);
-      // Update profile with collected info
       const { updateStudentProfile } = await import("@/hooks/use-student-auth");
       const profileData: Record<string, unknown> = {};
       if (form.nationality) profileData.nationality = form.nationality;
@@ -73,7 +73,7 @@ export function StudentRegister() {
       if (form.passportCountry) profileData.passportCountry = form.passportCountry;
       profileData.hasVisa = form.hasVisa;
       if (Object.keys(profileData).length > 0) {
-        const updated = await updateStudentProfile(profileData as any);
+        const updated = await updateStudentProfile(profileData as never);
         setStudent(updated);
       }
       setLocation("/dashboard");
@@ -95,11 +95,28 @@ export function StudentRegister() {
           <p className="text-muted-foreground">Find and apply to scholarships tailored for you</p>
         </div>
 
+        {/* Quick sign-up with Google — shown only on step 0 */}
+        {step === 0 && (
+          <div className="bg-card border border-border rounded-2xl p-6 mb-4 space-y-4">
+            <p className="text-sm font-medium text-center">Quick sign up</p>
+            <Auth0Button mode="signup" />
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">or fill in details below</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+          </div>
+        )}
+
         {/* Step indicator */}
-        <div className="flex items-center justify-center gap-2 mb-8">
+        <div className="flex items-center justify-center gap-2 mb-6">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${i < step ? "bg-primary text-primary-foreground" : i === step ? "bg-primary text-primary-foreground ring-2 ring-primary/30 ring-offset-2 ring-offset-background" : "bg-muted text-muted-foreground"}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                i < step ? "bg-primary text-primary-foreground"
+                : i === step ? "bg-primary text-primary-foreground ring-2 ring-primary/30 ring-offset-2 ring-offset-background"
+                : "bg-muted text-muted-foreground"
+              }`}>
                 {i < step ? <CheckCircle2 size={14} /> : i + 1}
               </div>
               {i < STEPS.length - 1 && <div className={`w-6 h-0.5 ${i < step ? "bg-primary" : "bg-muted"}`} />}
@@ -158,7 +175,7 @@ export function StudentRegister() {
                 <Select onValueChange={(v) => set("gpa", v)} value={form.gpa}>
                   <SelectTrigger className="mt-1"><SelectValue placeholder="Select GPA" /></SelectTrigger>
                   <SelectContent>
-                    {[["4.0", "4.0 (First Class / 90%+"], ["3.7", "3.7 (A- / 85%+)"], ["3.5", "3.5 (Merit / 80%+)"], ["3.0", "3.0 (2:1 / 70%+)"], ["2.5", "2.5 (2:2 / 60%+)"], ["2.0", "2.0 (Pass / 50%+)"]].map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                    {[["4.0","4.0 (First Class / 90%+"],["3.7","3.7 (A- / 85%+)"],["3.5","3.5 (Merit / 80%+)"],["3.0","3.0 (2:1 / 70%+)"],["2.5","2.5 (2:2 / 60%+)"],["2.0","2.0 (Pass / 50%+)"]].map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -172,12 +189,7 @@ export function StudentRegister() {
                 <Label className="mb-2 block">Desired Study Level (select all that apply)</Label>
                 <div className="flex flex-wrap gap-2">
                   {STUDY_LEVELS.map((l) => (
-                    <Badge
-                      key={l}
-                      variant={form.targetLevel.includes(l) ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => toggleArr("targetLevel", l)}
-                    >{l}</Badge>
+                    <Badge key={l} variant={form.targetLevel.includes(l) ? "default" : "outline"} className="cursor-pointer" onClick={() => toggleArr("targetLevel", l)}>{l}</Badge>
                   ))}
                 </div>
               </div>
@@ -185,12 +197,7 @@ export function StudentRegister() {
                 <Label className="mb-2 block">Preferred Destination Countries</Label>
                 <div className="flex flex-wrap gap-2">
                   {DEST_COUNTRIES.map((c) => (
-                    <Badge
-                      key={c}
-                      variant={form.targetCountry.includes(c) ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => toggleArr("targetCountry", c)}
-                    >{c}</Badge>
+                    <Badge key={c} variant={form.targetCountry.includes(c) ? "default" : "outline"} className="cursor-pointer" onClick={() => toggleArr("targetCountry", c)}>{c}</Badge>
                   ))}
                 </div>
               </div>
@@ -200,7 +207,7 @@ export function StudentRegister() {
                 <Select onValueChange={(v) => set("studyTimeline", v)} value={form.studyTimeline}>
                   <SelectTrigger className="mt-1"><SelectValue placeholder="When do you want to start?" /></SelectTrigger>
                   <SelectContent>
-                    {["2025", "2026", "2027", "Not sure yet"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {["2025","2026","2027","Not sure yet"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -214,7 +221,7 @@ export function StudentRegister() {
                 <Select onValueChange={(v) => set("englishLevel", v)} value={form.englishLevel}>
                   <SelectTrigger className="mt-1"><SelectValue placeholder="Select proficiency" /></SelectTrigger>
                   <SelectContent>
-                    {["Native Speaker", "IELTS", "TOEFL", "Not yet tested"].map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                    {["Native Speaker","IELTS","TOEFL","Not yet tested"].map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -246,7 +253,7 @@ export function StudentRegister() {
               <Button onClick={next} className="flex-1 gap-2">Continue <ChevronRight size={16} /></Button>
             ) : (
               <Button onClick={handleSubmit} className="flex-1 gap-2" disabled={loading}>
-                {loading ? <><Loader2 size={16} className="animate-spin" /> Creating account...</> : <><GraduationCap size={16} /> Create Account</>}
+                {loading ? <><Loader2 size={16} className="animate-spin" /> Creating account…</> : <><GraduationCap size={16} /> Create Account</>}
               </Button>
             )}
           </div>

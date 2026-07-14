@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { studentLogin } from "@/hooks/use-student-auth";
 import { useStudent } from "@/hooks/use-student-auth";
 import { Loader2, GraduationCap } from "lucide-react";
+import { Auth0Button } from "@/components/auth/auth0-button";
 
 export function StudentLogin() {
   const [, setLocation] = useLocation();
@@ -38,15 +39,26 @@ export function StudentLogin() {
             S
           </div>
           <h1 className="font-serif text-3xl font-bold mb-2">Welcome Back</h1>
-          <p className="text-muted-foreground">Sign in to your student account</p>
+          <p className="text-muted-foreground">Sign in to your Scholr account</p>
         </div>
 
-        <div className="bg-card border border-border rounded-2xl p-8">
+        <div className="bg-card border border-border rounded-2xl p-8 space-y-5">
+          {/* Google / Social sign-in */}
+          <Auth0Button mode="login" />
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground">or continue with email</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm mb-6">
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm">
               {error}
             </div>
           )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label>Email Address</Label>
@@ -72,9 +84,9 @@ export function StudentLogin() {
             </div>
             <Button type="submit" className="w-full gap-2 mt-2" disabled={loading}>
               {loading ? (
-                <><Loader2 size={16} className="animate-spin" /> Signing in...</>
+                <><Loader2 size={16} className="animate-spin" /> Signing in…</>
               ) : (
-                <><GraduationCap size={16} /> Sign In</>
+                <><GraduationCap size={16} /> Sign In with Email</>
               )}
             </Button>
           </form>

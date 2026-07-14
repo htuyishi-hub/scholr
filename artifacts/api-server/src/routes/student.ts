@@ -77,6 +77,45 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// POST /api/student/auth0 — social sign-in via Auth0 (creates account if needed)
+router.post("/auth0", async (req, res) => {
+  const { email, name, sub, picture } = req.body as {
+    email: string; name: string; sub: string; picture?: string;
+  };
+  if (!email || !name || !sub) {
+    res.status(400).json({ error: "email, name, and sub required" });
+    return;
+  }
+  try {
+    const normalEmail = email.toLowerCase().trim();
+    let [student] = await db
+      .select()
+      .from(studentProfilesTable)
+      .where(eq(studentProfilesTable.email, normalEmail))
+      .limit(1);
+
+    if (!student) {
+      // New user — create account (no password since social login)
+      [student] = await db
+        .insert(studentProfilesTable)
+        .values({
+          email: normalEmail,
+          name,
+          passwordHash: `auth0:${sub}`, // placeholder — can't be used for password login
+          ...(picture ? { avatarUrl: picture } : {}),
+        })
+        .returning();
+    }
+
+    const token = generateToken();
+    storeToken(`student:${token}`, student.id);
+    res.json({ student: safeStudent(student), token });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /api/student/logout
 router.post("/logout", (req, res) => {
   const auth = req.headers.authorization;
