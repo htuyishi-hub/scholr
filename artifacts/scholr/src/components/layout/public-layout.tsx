@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Compass, Search, Info, MessageCircle, Menu, X, ArrowRight, User, GraduationCap, LogOut } from "lucide-react";
+import { MessageCircle, Menu, X, User, GraduationCap, LogOut, Briefcase } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useStudent } from "@/hooks/use-student-auth";
@@ -55,6 +55,15 @@ export function PublicLayout({ children }: { children: ReactNode }) {
               Browse
             </Link>
             <Link
+              href="/jobs"
+              className={`text-sm font-medium transition-colors hover:text-primary flex items-center gap-1.5 ${
+                location.startsWith("/jobs") ? "text-primary" : "text-muted-foreground"
+              }`}
+            >
+              <Briefcase size={14} />
+              Jobs
+            </Link>
+            <Link
               href="/find-my-scholarship"
               className={`text-sm font-medium transition-colors hover:text-primary ${
                 location.startsWith("/find-my-scholarship") ? "text-primary" : "text-muted-foreground"
@@ -107,6 +116,9 @@ export function PublicLayout({ children }: { children: ReactNode }) {
           <div className="md:hidden absolute top-full left-0 right-0 bg-card border-b border-border shadow-lg py-4 px-4 flex flex-col gap-2">
             <Link href="/browse" className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted" onClick={() => setMobileMenuOpen(false)}>
               Browse Opportunities
+            </Link>
+            <Link href="/jobs" className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
+              <Briefcase size={16} /> Jobs
             </Link>
             <Link href="/find-my-scholarship" className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted" onClick={() => setMobileMenuOpen(false)}>
               Find My Match

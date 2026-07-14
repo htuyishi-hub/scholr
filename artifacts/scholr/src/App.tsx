@@ -18,6 +18,7 @@ import { StudentLogin } from "@/pages/public/student-login";
 import { StudentDashboard } from "@/pages/public/student-dashboard";
 import { StudentProfile } from "@/pages/public/student-profile";
 import { FindScholarship } from "@/pages/public/find-scholarship";
+import { Jobs } from "@/pages/public/jobs";
 
 import { Login } from "@/pages/admin/login";
 import { Dashboard } from "@/pages/admin/dashboard";
@@ -27,6 +28,8 @@ import { Team } from "@/pages/admin/team";
 import { Settings } from "@/pages/admin/settings";
 import { AdminApplications } from "@/pages/admin/applications";
 import { AdminApplicationDetail } from "@/pages/admin/application-detail";
+import { ScraperPanel } from "@/pages/admin/scraper-panel";
+import { JobsPanel } from "@/pages/admin/jobs-panel";
 
 const queryClient = new QueryClient();
 
@@ -40,129 +43,91 @@ function Router() {
       </Route>
 
       <Route path="/admin/dashboard">
-        <AuthGuard>
-          <AdminLayout>
-            <Dashboard />
-          </AdminLayout>
-        </AuthGuard>
+        <AuthGuard><AdminLayout><Dashboard /></AdminLayout></AuthGuard>
       </Route>
 
       <Route path="/admin/posts">
-        <AuthGuard>
-          <AdminLayout>
-            <Posts />
-          </AdminLayout>
-        </AuthGuard>
+        <AuthGuard><AdminLayout><Posts /></AdminLayout></AuthGuard>
       </Route>
 
       <Route path="/admin/posts/new">
-        <AuthGuard>
-          <AdminLayout>
-            <PostsForm />
-          </AdminLayout>
-        </AuthGuard>
+        <AuthGuard><AdminLayout><PostsForm /></AdminLayout></AuthGuard>
       </Route>
 
       <Route path="/admin/posts/:id/edit">
         {params => (
-          <AuthGuard>
-            <AdminLayout>
-              <PostsForm id={params.id} />
-            </AdminLayout>
-          </AuthGuard>
+          <AuthGuard><AdminLayout><PostsForm id={params.id} /></AdminLayout></AuthGuard>
         )}
       </Route>
 
       <Route path="/admin/applications">
-        <AuthGuard>
-          <AdminLayout>
-            <AdminApplications />
-          </AdminLayout>
-        </AuthGuard>
+        <AuthGuard><AdminLayout><AdminApplications /></AdminLayout></AuthGuard>
       </Route>
 
       <Route path="/admin/applications/:id">
         {params => (
-          <AuthGuard>
-            <AdminLayout>
-              <AdminApplicationDetail id={params.id} />
-            </AdminLayout>
-          </AuthGuard>
+          <AuthGuard><AdminLayout><AdminApplicationDetail id={params.id} /></AdminLayout></AuthGuard>
         )}
       </Route>
 
+      <Route path="/admin/jobs">
+        <AuthGuard><AdminLayout><JobsPanel /></AdminLayout></AuthGuard>
+      </Route>
+
+      <Route path="/admin/scraper">
+        <AuthGuard><AdminLayout><ScraperPanel /></AdminLayout></AuthGuard>
+      </Route>
+
       <Route path="/admin/team">
-        <AuthGuard>
-          <AdminLayout>
-            <Team />
-          </AdminLayout>
-        </AuthGuard>
+        <AuthGuard><AdminLayout><Team /></AdminLayout></AuthGuard>
       </Route>
 
       <Route path="/admin/settings">
-        <AuthGuard>
-          <AdminLayout>
-            <Settings />
-          </AdminLayout>
-        </AuthGuard>
+        <AuthGuard><AdminLayout><Settings /></AdminLayout></AuthGuard>
       </Route>
 
       {/* Student Auth Routes */}
       <Route path="/register">
-        <PublicLayout>
-          <StudentRegister />
-        </PublicLayout>
+        <PublicLayout><StudentRegister /></PublicLayout>
       </Route>
 
       <Route path="/login">
-        <PublicLayout>
-          <StudentLogin />
-        </PublicLayout>
+        <PublicLayout><StudentLogin /></PublicLayout>
       </Route>
 
       <Route path="/dashboard">
-        <PublicLayout>
-          <StudentDashboard />
-        </PublicLayout>
+        <PublicLayout><StudentDashboard /></PublicLayout>
       </Route>
 
       <Route path="/profile">
-        <PublicLayout>
-          <StudentProfile />
-        </PublicLayout>
+        <PublicLayout><StudentProfile /></PublicLayout>
       </Route>
 
       <Route path="/find-my-scholarship">
-        <PublicLayout>
-          <FindScholarship />
-        </PublicLayout>
+        <PublicLayout><FindScholarship /></PublicLayout>
       </Route>
 
       {/* Public Routes */}
       <Route path="/">
-        <PublicLayout>
-          <Home />
-        </PublicLayout>
+        <PublicLayout><Home /></PublicLayout>
       </Route>
 
       <Route path="/browse">
-        <PublicLayout>
-          <Browse />
-        </PublicLayout>
+        <PublicLayout><Browse /></PublicLayout>
+      </Route>
+
+      <Route path="/jobs">
+        <PublicLayout><Jobs /></PublicLayout>
       </Route>
 
       <Route path="/opportunity/:slug">
         {params => (
-          <PublicLayout>
-            <OpportunityDetail slug={params.slug} />
-          </PublicLayout>
+          <PublicLayout><OpportunityDetail slug={params.slug} /></PublicLayout>
         )}
       </Route>
 
       <Route path="/about">
-        <PublicLayout>
-          <About />
-        </PublicLayout>
+        <PublicLayout><About /></PublicLayout>
       </Route>
 
       <Route component={NotFound} />

@@ -10,6 +10,8 @@ import studentRouter from "./student.js";
 import applicationsRouter from "./applications.js";
 import aiRouter from "./ai.js";
 import storageRouter from "./storage.js";
+import jobsRouter from "./jobs.js";
+import scraperRouter from "./scraper.js";
 
 const router: IRouter = Router();
 
@@ -24,5 +26,7 @@ router.use("/student", studentRouter);
 router.use("/applications", applicationsRouter);
 router.use("/ai", aiRouter);
 router.use(storageRouter);
+router.use(jobsRouter);
+router.use(scraperRouter);
 
 export default router;
