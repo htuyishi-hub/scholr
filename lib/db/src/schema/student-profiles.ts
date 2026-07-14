@@ -32,6 +32,7 @@ export const studentProfilesTable = pgTable("student_profiles", {
   studyTimeline: text("study_timeline"),
   passportCountry: text("passport_country"),
   hasVisa: boolean("has_visa").default(false),
+  avatarUrl: text("avatar_url"),
   whatsappNumber: text("whatsapp_number"),
   profileComplete: boolean("profile_complete").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
