@@ -1,0 +1,31 @@
+# Railway config for frontend service (Vite React)
+# Project root: artifacts/scholr
+
+services:
+  - name: scholarship-web
+    type: web
+
+    build:
+      # install + build from this monorepo workspace
+      command: "cd artifacts/scholr && pnpm install --frozen-lockfile && pnpm run build"
+
+    start:
+      # Vite 'serve' is fine, but for production you should serve the built dist
+      # This repo outputs to: artifacts/scholr/dist/public
+      # We'll use a lightweight static server.
+      command: "cd artifacts/scholr && npx --yes serve -s dist/public -l $PORT --no-clipboard"
+
+    env:
+      - key: NODE_ENV
+        value: production
+      # Frontend should call the backend at this URL
+      - key: VITE_API_BASE_URL
+        value: "https://scholarship-api.up.railway.app"
+
+    # Basic healthcheck: ensure index.html is served
+    healthcheck:
+      path: /
+      intervalSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+
