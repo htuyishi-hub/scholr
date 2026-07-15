@@ -17,6 +17,10 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _retryConfig = {
+  maxAttempts: 3,
+  delayMs: 5000,
+};
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -42,6 +46,21 @@ export function setBaseUrl(url: string | null): void {
  */
 export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
+}
+
+export function setRetryConfig(options: { maxAttempts?: number; delayMs?: number } | null): void {
+  if (!options) {
+    _retryConfig = { maxAttempts: 3, delayMs: 5000 };
+    return;
+  }
+
+  const maxAttempts = Number(options.maxAttempts);
+  const delayMs = Number(options.delayMs);
+
+  _retryConfig = {
+    maxAttempts: Number.isFinite(maxAttempts) && maxAttempts > 0 ? Math.floor(maxAttempts) : 3,
+    delayMs: Number.isFinite(delayMs) && delayMs >= 0 ? Math.floor(delayMs) : 5000,
+  };
 }
 
 function isRequest(input: RequestInfo | URL): input is Request {
@@ -322,6 +341,23 @@ async function parseSuccessBody(
   }
 }
 
+function shouldRetry(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    return error.status === 408 || error.status === 429 || error.status >= 500;
+  }
+
+  if (error instanceof TypeError) return true;
+  if (error instanceof DOMException) {
+    return error.name === "AbortError" || error.name === "TimeoutError";
+  }
+
+  return false;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function customFetch<T = unknown>(
   input: RequestInfo | URL,
   options: CustomFetchOptions = {},
@@ -335,37 +371,62 @@ export async function customFetch<T = unknown>(
     throw new TypeError(`customFetch: ${method} requests cannot have a body.`);
   }
 
-  const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
+  let lastError: unknown;
 
-  if (
-    typeof init.body === "string" &&
-    !headers.has("content-type") &&
-    looksLikeJson(init.body)
-  ) {
-    headers.set("content-type", "application/json");
-  }
+  for (let attempt = 1; attempt <= _retryConfig.maxAttempts; attempt += 1) {
+    try {
+      const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
 
-  if (responseType === "json" && !headers.has("accept")) {
-    headers.set("accept", DEFAULT_JSON_ACCEPT);
-  }
+      if (
+        typeof init.body === "string" &&
+        !headers.has("content-type") &&
+        looksLikeJson(init.body)
+      ) {
+        headers.set("content-type", "application/json");
+      }
 
-  // Attach bearer token when an auth getter is configured and no
-  // Authorization header has been explicitly provided.
-  if (_authTokenGetter && !headers.has("authorization")) {
-    const token = await _authTokenGetter();
-    if (token) {
-      headers.set("authorization", `Bearer ${token}`);
+      if (responseType === "json" && !headers.has("accept")) {
+        headers.set("accept", DEFAULT_JSON_ACCEPT);
+      }
+
+      // Attach bearer token when an auth getter is configured and no
+      // Authorization header has been explicitly provided.
+      if (_authTokenGetter && !headers.has("authorization")) {
+        const token = await _authTokenGetter();
+        if (token) {
+          headers.set("authorization", `Bearer ${token}`);
+        }
+      }
+
+      const requestInfo = { method, url: resolveUrl(input) };
+
+      const response = await fetch(input, { ...init, method, headers });
+
+      if (!response.ok) {
+        const errorData = await parseErrorBody(response, method);
+        const error = new ApiError(response, errorData, requestInfo);
+
+        if (shouldRetry(error) && attempt < _retryConfig.maxAttempts) {
+          lastError = error;
+          await sleep(_retryConfig.delayMs);
+          continue;
+        }
+
+        throw error;
+      }
+
+      return (await parseSuccessBody(response, responseType, requestInfo)) as T;
+    } catch (error) {
+      lastError = error;
+
+      if (shouldRetry(error) && attempt < _retryConfig.maxAttempts) {
+        await sleep(_retryConfig.delayMs);
+        continue;
+      }
+
+      throw error;
     }
   }
 
-  const requestInfo = { method, url: resolveUrl(input) };
-
-  const response = await fetch(input, { ...init, method, headers });
-
-  if (!response.ok) {
-    const errorData = await parseErrorBody(response, method);
-    throw new ApiError(response, errorData, requestInfo);
-  }
-
-  return (await parseSuccessBody(response, responseType, requestInfo)) as T;
+  throw lastError;
 }
