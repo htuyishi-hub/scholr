@@ -262,6 +262,14 @@ async function signObjectURL({
     );
   }
 
-  const { signed_url: signedURL } = await response.json();
+  const json: unknown = await response.json();
+  if (typeof json !== "object" || json === null || !("signed_url" in json)) {
+    throw new Error("Failed to parse signed object URL response");
+  }
+  const signedURL = (json as { signed_url?: unknown }).signed_url;
+  if (typeof signedURL !== "string") {
+    throw new Error("Failed to parse signed object URL response");
+  }
   return signedURL;
+
 }

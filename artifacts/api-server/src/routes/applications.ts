@@ -165,9 +165,35 @@ router.get("/admin/all", async (req, res) => {
   if (!adminId) { res.status(401).json({ error: "Not authenticated as admin" }); return; }
   try {
     const { status } = req.query as { status?: string };
-    const apps = await (status
-      ? db.select().from(managedApplicationsTable).where(eq(managedApplicationsTable.status, status)).orderBy(desc(managedApplicationsTable.createdAt))
-      : db.select().from(managedApplicationsTable).orderBy(desc(managedApplicationsTable.createdAt)));
+
+    const allowedStatuses = new Set([
+      "pending_review",
+      "profile_check",
+      "documents_collection",
+      "in_progress",
+      "submitted",
+      "accepted",
+      "rejected",
+    ] as const);
+
+    const apps = await (
+      status && allowedStatuses.has(status as any)
+        ? db
+            .select()
+            .from(managedApplicationsTable)
+            .where(
+              eq(
+                managedApplicationsTable.status,
+                status as (typeof allowedStatuses extends Set<infer U> ? U : never),
+              ),
+            )
+            .orderBy(desc(managedApplicationsTable.createdAt))
+        : db
+            .select()
+            .from(managedApplicationsTable)
+            .orderBy(desc(managedApplicationsTable.createdAt))
+    );
+
     const enriched = await Promise.all(apps.map(async (app) => {
       const [student] = await db.select().from(studentProfilesTable).where(eq(studentProfilesTable.id, app.studentId)).limit(1);
       const [opp] = await db.select().from(opportunitiesTable).where(eq(opportunitiesTable.id, app.opportunityId)).limit(1);
