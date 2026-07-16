@@ -175,16 +175,16 @@ export function PostsForm({ id }: { id?: string }) {
 
   useEffect(() => {
     if (existing) {
-      const e = existing as Record<string, unknown>;
+      const e = existing;
       setForm({
         title: existing.title || "",
         slug: existing.slug || "",
         description: existing.description || "",
         content: existing.content || "",
         coverImage: existing.coverImage || "",
-        category: existing.category || "Scholarships",
+        category: (existing.category || "Scholarships") as string,
         country: existing.country || "",
-        fundingType: existing.fundingType || "full",
+        fundingType: (existing.fundingType || "full") as string,
         studyLevel: existing.studyLevel || ["masters"],
         deadline: existing.deadline ? existing.deadline.slice(0, 10) : "",
         amount: existing.amount || "",
@@ -192,24 +192,24 @@ export function PostsForm({ id }: { id?: string }) {
         whatsappNumber: existing.whatsappNumber || "",
         tags: (existing.tags || []).filter((t): t is string => typeof t === "string" && !["Fast Response","Open to All","Women Only","Highly Competitive","No Essay Required","STEM","Africa Focus","No Interview Required"].includes(t)).join(", "),
         smartTags: (existing.tags || []).filter((t): t is string => ["Fast Response","Open to All","Women Only","Highly Competitive","No Essay Required","STEM","Africa Focus","No Interview Required"].includes(t as string)),
-        status: (existing.status as any) || "draft",
+        status: (existing.status || "draft") as any,
         featured: existing.featured || false,
         pinned: existing.pinned || false,
-        minGpa: String(e.minGpa || ""),
-        minEnglishIelts: String(e.minEnglishIelts || ""),
-        genderRestriction: String(e.genderRestriction || ""),
-        hostOrganization: String(e.hostOrganization || ""),
-        hostWebsite: String(e.hostWebsite || ""),
-        scholarshipType: String(e.scholarshipType || ""),
-        renewable: Boolean(e.renewable),
-        numberOfAwards: String(e.numberOfAwards || ""),
-        applicationFee: String(e.applicationFee || ""),
-        interviewRequired: Boolean(e.interviewRequired),
-        essayRequired: Boolean(e.essayRequired),
-        referenceLetters: String(e.referenceLetters || ""),
-        notificationDate: e.notificationDate ? String(e.notificationDate).slice(0, 10) : "",
-        programDuration: String(e.programDuration || ""),
-        requiredDocuments: Array.isArray(e.requiredDocuments) ? (e.requiredDocuments as string[]) : [],
+        minGpa: String((e as any).minGpa || ""),
+        minEnglishIelts: String((e as any).minEnglishIelts || ""),
+        genderRestriction: String((e as any).genderRestriction || ""),
+        hostOrganization: String((e as any).hostOrganization || ""),
+        hostWebsite: String((e as any).hostWebsite || ""),
+        scholarshipType: String((e as any).scholarshipType || ""),
+        renewable: Boolean((e as any).renewable),
+        numberOfAwards: String((e as any).numberOfAwards || ""),
+        applicationFee: String((e as any).applicationFee || ""),
+        interviewRequired: Boolean((e as any).interviewRequired),
+        essayRequired: Boolean((e as any).essayRequired),
+        referenceLetters: String((e as any).referenceLetters || ""),
+        notificationDate: (e as any).notificationDate ? String((e as any).notificationDate).slice(0, 10) : "",
+        programDuration: String((e as any).programDuration || ""),
+        requiredDocuments: Array.isArray((e as any).requiredDocuments) ? ((e as any).requiredDocuments as string[]) : [],
       });
       setSlugEdited(true);
     }
@@ -288,22 +288,22 @@ export function PostsForm({ id }: { id?: string }) {
       status: (publish ? "published" : form.status) as "published" | "draft" | "archived",
       featured: form.featured,
       pinned: form.pinned,
-    } as Record<string, unknown>;
+    };
 
     // Advanced fields — only include when set
-    if (form.hostOrganization) payload.hostOrganization = form.hostOrganization;
-    if (form.minGpa) payload.minGpa = form.minGpa;
-    if (form.minEnglishIelts) payload.minEnglishIelts = form.minEnglishIelts;
-    if (form.genderRestriction) payload.genderRestriction = form.genderRestriction;
-    if (form.numberOfAwards) payload.numberOfAwards = parseInt(form.numberOfAwards, 10);
-    if (form.applicationFee) payload.applicationFee = form.applicationFee;
-    if (form.programDuration) payload.programDuration = form.programDuration;
-    if (form.notificationDate) payload.notificationDate = form.notificationDate;
-    if (form.referenceLetters) payload.referenceLetters = parseInt(form.referenceLetters, 10);
-    payload.renewable = form.renewable;
-    payload.interviewRequired = form.interviewRequired;
-    payload.essayRequired = form.essayRequired;
-    if (form.requiredDocuments.length > 0) payload.requiredDocuments = form.requiredDocuments;
+    if (form.hostOrganization) (payload as any).hostOrganization = form.hostOrganization;
+    if (form.minGpa) (payload as any).minGpa = form.minGpa;
+    if (form.minEnglishIelts) (payload as any).minEnglishIelts = form.minEnglishIelts;
+    if (form.genderRestriction) (payload as any).genderRestriction = form.genderRestriction;
+    if (form.numberOfAwards) (payload as any).numberOfAwards = parseInt(form.numberOfAwards, 10);
+    if (form.applicationFee) (payload as any).applicationFee = form.applicationFee;
+    if (form.programDuration) (payload as any).programDuration = form.programDuration;
+    if (form.notificationDate) (payload as any).notificationDate = form.notificationDate;
+    if (form.referenceLetters) (payload as any).referenceLetters = parseInt(form.referenceLetters, 10);
+    (payload as any).renewable = form.renewable;
+    (payload as any).interviewRequired = form.interviewRequired;
+    (payload as any).essayRequired = form.essayRequired;
+    if (form.requiredDocuments.length > 0) (payload as any).requiredDocuments = form.requiredDocuments;
 
     if (isEdit && id) {
       updateOpp.mutate(

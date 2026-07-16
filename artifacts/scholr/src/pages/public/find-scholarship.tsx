@@ -67,7 +67,8 @@ export function FindScholarship() {
   const [answers, setAnswers] = useState<QuizAnswers>({
     level: "", field: "", destinations: [], gpa: "", english: "", timeline: ""
   });
-  const [results, setResults] = useState<Record<string, unknown>[]>([]);
+  type Opportunity = Parameters<typeof OpportunityCard>[0]["opp"];
+  const [results, setResults] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -85,10 +86,16 @@ export function FindScholarship() {
   const handleSearch = async () => {
     setLoading(true);
     const opps = await searchOpportunities(answers);
+
     const scored = opps
-      .map((o: Record<string, unknown>) => ({ ...o, _match: computeMatch(o, answers) }))
-      .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (b._match as number) - (a._match as number));
-    setResults(scored);
+      .map((o: Record<string, unknown>) => {
+        // computeMatch expects a record; OpportunityCard expects typed opportunity.
+        const _match = computeMatch(o, answers);
+        return { ...(o as any), _match } as any as Opportunity & { _match: number };
+      })
+      .sort((a: any, b: any) => (b._match as number) - (a._match as number));
+
+    setResults(scored as Opportunity[]);
     setLoading(false);
     setDone(true);
   };

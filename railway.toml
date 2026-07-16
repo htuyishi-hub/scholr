@@ -1,20 +1,37 @@
-# Railway config-as-code for the BACKEND service (Express API)
-# This is placed at repo root so Railway can auto-detect build/start.
-# Project root for this service: artifacts/api-server
 
-[build]
-# Build from the workspace package
-command = "cd artifacts/api-server && pnpm install --frozen-lockfile && pnpm run build"
+# Railway multi-service config (deploy frontend + backend together)
 
-[deploy]
-# Start the built server (requires PORT provided by Railway)
-startCommand = "cd artifacts/api-server && pnpm start"
+services:
+  - name: scholarship-api
+    type: web
+    build:
+      command: "pnpm install --frozen-lockfile && pnpm -r --filter @workspace/api-server run build"
+    start:
+      command: "cd artifacts/api-server && pnpm start"
+    healthcheck:
+      path: /api/healthz
+      intervalSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    env:
+      - key: NODE_ENV
+        value: production
 
+  - name: scholarship-web
+    type: web
+    build:
+      command: "cd artifacts/scholr && pnpm install --frozen-lockfile && pnpm run build"
+    start:
+      command: "cd artifacts/scholr && npx --yes serve -s dist/public -l $PORT --no-clipboard"
+    healthcheck:
+      path: /
+      intervalSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    env:
+      - key: NODE_ENV
+        value: production
+      - key: VITE_API_BASE_URL
+        value: "https://scholarship-api.up.railway.app"
 
-[healthcheck]
-# Mounted by api-server at /api/healthz
-path = "/api/healthz"
-intervalSeconds = 10
-timeoutSeconds = 5
-failureThreshold = 3
 
