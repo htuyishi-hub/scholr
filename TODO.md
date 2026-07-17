@@ -1,15 +1,8 @@
-# TODO - Railway deploy backend + frontend
-
-- [x] Create Railway config(s) for two services: backend (artifacts/api-server) and frontend (artifacts/scholr)
-
-- [x] Ensure backend exposes healthcheck endpoint: /api/healthz (or /api/healthz)
-
-- [x] Configure frontend to build into static assets and start via a production static server
-
-- [x] Configure frontend env var VITE_API_BASE_URL to point at backend Railway URL
-
-- [ ] Add railway-specific ignore/watch paths (if using railway.toml)
-- [ ] Deploy frontend (frontend needs its own Railway project/config; current Railway config at repo root is for backend)
-- [x] Provide local verification commands (pnpm install/build/start) per service
-
+## TODO
+- [x] Fix pnpm/lockfile mismatch between local pnpm and Railway pnpm by regenerating lockfile with pnpm 9.
+- [x] Fix esbuild resolution issues for api-server build.
+- [x] Fix esbuild resolution issues for scholr (Vite/esbuild index.js mismatch).
+- [x] Remove temporary node_modules shim and make esbuild version compatible by pinning esbuild@0.25.8.
+- [x] Confirm api-server build passes; confirm scholr build passes.
+- [ ] Fix runtime crash on Railway due to missing DATABASE_URL by making db initialization not hard-fail on import.
 
