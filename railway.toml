@@ -4,7 +4,7 @@
 # This file is kept minimal so the Railway config parser succeeds.
 
 [build]
-command = "pnpm install --frozen-lockfile && pnpm -r --filter @workspace/api-server run build"
+
 
 [start]
 command = "cd artifacts/api-server && pnpm start"
