@@ -61,12 +61,12 @@ router.get("/activity", async (req, res) => {
       .limit(20);
 
     res.json(
-      activities.map((a) => ({
+      activities.map((a: Record<string, unknown>) => ({
         id: a.id,
         action: a.action,
         opportunityTitle: a.opportunityTitle,
         authorName: a.authorName,
-        createdAt: a.createdAt.toISOString(),
+        createdAt: (a.createdAt as Date).toISOString(),
       }))
     );
   } catch (err) {
@@ -85,7 +85,7 @@ router.get("/top-posts", async (req, res) => {
       .limit(5);
 
     res.json(
-      posts.map((p) => ({
+      posts.map((p: Record<string, unknown>) => ({
         id: p.id,
         title: p.title,
         slug: p.slug,
@@ -109,8 +109,8 @@ router.get("/top-posts", async (req, res) => {
         author: null,
         seoTitle: p.seoTitle,
         metaDescription: p.metaDescription,
-        createdAt: p.createdAt.toISOString(),
-        updatedAt: p.updatedAt.toISOString(),
+        createdAt: (p.createdAt as Date).toISOString(),
+        updatedAt: (p.updatedAt as Date).toISOString(),
       }))
     );
   } catch (err) {
@@ -152,7 +152,7 @@ router.get("/views-by-category", async (req, res) => {
       .groupBy(opportunitiesTable.category)
       .orderBy(sql`SUM(${opportunitiesTable.views}) DESC`);
 
-    res.json(rows.map((r) => ({ category: r.category!, views: r.views })));
+    res.json(rows.map((r: Record<string, unknown>) => ({ category: r.category, views: r.views })) );
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
