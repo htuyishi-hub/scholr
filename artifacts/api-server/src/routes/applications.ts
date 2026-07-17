@@ -133,10 +133,16 @@ router.get("/", async (req, res) => {
     const apps = await db.select().from(managedApplicationsTable)
       .where(eq(managedApplicationsTable.studentId, studentId))
       .orderBy(desc(managedApplicationsTable.createdAt));
-    const enriched = await Promise.all(apps.map(async (app) => {
-      const [opp] = await db.select().from(opportunitiesTable).where(eq(opportunitiesTable.id, app.opportunityId)).limit(1);
-      return mapApp(app as Record<string, unknown>, null, opp as Record<string, unknown> | null);
-    }));
+const enriched = await Promise.all(
+      apps.map(async (app: Record<string, unknown>) => {
+        const [opp] = await db
+          .select()
+          .from(opportunitiesTable)
+          .where(eq(opportunitiesTable.id, app.opportunityId as string))
+          .limit(1);
+        return mapApp(app, null, opp as Record<string, unknown> | null);
+      }),
+    );
     res.json(enriched);
   } catch (err) {
     req.log.error(err);
@@ -194,14 +200,38 @@ router.get("/admin/all", async (req, res) => {
             .orderBy(desc(managedApplicationsTable.createdAt))
     );
 
-    const enriched = await Promise.all(apps.map(async (app) => {
-      const [student] = await db.select().from(studentProfilesTable).where(eq(studentProfilesTable.id, app.studentId)).limit(1);
-      const [opp] = await db.select().from(opportunitiesTable).where(eq(opportunitiesTable.id, app.opportunityId)).limit(1);
-      const handler = app.assignedTo
-        ? (await db.select().from(usersTable).where(eq(usersTable.id, app.assignedTo)).limit(1))[0]
-        : null;
-      return mapApp(app as Record<string, unknown>, student as Record<string, unknown> | null, opp as Record<string, unknown> | null, handler as Record<string, unknown> | null);
-    }));
+const enriched = await Promise.all(
+      apps.map(async (app: Record<string, unknown>) => {
+        const [student] = await db
+          .select()
+          .from(studentProfilesTable)
+          .where(eq(studentProfilesTable.id, app.studentId as string))
+          .limit(1);
+
+        const [opp] = await db
+          .select()
+          .from(opportunitiesTable)
+          .where(eq(opportunitiesTable.id, app.opportunityId as string))
+          .limit(1);
+
+        const handler = app.assignedTo
+          ? (
+              await db
+                .select()
+                .from(usersTable)
+                .where(eq(usersTable.id, app.assignedTo as string))
+                .limit(1)
+            )[0]
+          : null;
+
+        return mapApp(
+          app,
+          student as Record<string, unknown> | null,
+          opp as Record<string, unknown> | null,
+          handler as Record<string, unknown> | null,
+        );
+      }),
+    );
     res.json(enriched);
   } catch (err) {
     req.log.error(err);
