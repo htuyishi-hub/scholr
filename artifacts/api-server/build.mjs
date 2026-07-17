@@ -1,20 +1,32 @@
+
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
 import { rm } from "node:fs/promises";
+
+const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
 
-const artifactDir = path.dirname(fileURLToPath(import.meta.url));
+// Load esbuild via require to avoid pnpm symlink + ESM resolver edge cases.
+// esbuild@0.27.3 main entry is lib/main.js (no index.js).
+function loadEsbuild() {
+  const main = globalThis.require(path.resolve(artifactDir, "node_modules/esbuild/lib/main.js"));
+  return main;
+}
+
+
+
 
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
 
-  await esbuild({
+  const esbuild = loadEsbuild();
+
+  await esbuild.build({
     entryPoints: [path.resolve(artifactDir, "src/index.ts")],
     platform: "node",
     bundle: true,

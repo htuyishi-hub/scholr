@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
+
 const rawPort = process.env.PORT ?? "3000";
 
 const port = Number(rawPort);
@@ -13,6 +14,10 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const basePath = process.env.BASE_PATH ?? "/";
+
+// Workaround: vite@7 expects esbuild to expose `index.js`, but our esbuild@0.27.3 only ships `lib/main.js`.
+// By aliasing below, we ensure Vite resolves to the correct entry.
+
 
 export default defineConfig({
   base: basePath,
@@ -41,6 +46,10 @@ export default defineConfig({
       // Force single React instance so Auth0 SDK shares the app's React
       "react": path.resolve(import.meta.dirname, "node_modules/react"),
       "react-dom": path.resolve(import.meta.dirname, "node_modules/react-dom"),
+
+      // Vite@7 incorrectly looks for esbuild/index.js.
+      // Our esbuild@0.27.3 entry is lib/main.js.
+      "esbuild/index.js": path.resolve(import.meta.dirname, "node_modules/esbuild/lib/main.js"),
     },
     dedupe: ["react", "react-dom"],
   },

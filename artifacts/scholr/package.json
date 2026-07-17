@@ -75,6 +75,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "esbuild": "^0.27.3",
     "@auth0/auth0-react": "^2.21.0",
     "@uppy/aws-s3": "^5.1.0",
     "@uppy/core": "^5.2.0",
