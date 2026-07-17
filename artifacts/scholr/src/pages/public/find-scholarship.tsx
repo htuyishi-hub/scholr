@@ -67,7 +67,8 @@ export function FindScholarship() {
   const [answers, setAnswers] = useState<QuizAnswers>({
     level: "", field: "", destinations: [], gpa: "", english: "", timeline: ""
   });
-  type Opportunity = Parameters<typeof OpportunityCard>[0]["opp"];
+type Opportunity = Parameters<typeof OpportunityCard>[0]["opp"];
+  type OpportunityWithMatch = Opportunity & { _match: number };
   const [results, setResults] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -87,13 +88,13 @@ export function FindScholarship() {
     setLoading(true);
     const opps = await searchOpportunities(answers);
 
-    const scored = opps
+const scored = opps
       .map((o: Record<string, unknown>) => {
         // computeMatch expects a record; OpportunityCard expects typed opportunity.
         const _match = computeMatch(o, answers);
-        return { ...(o as any), _match } as any as Opportunity & { _match: number };
+        return { ...(o as any), _match } as OpportunityWithMatch;
       })
-      .sort((a: any, b: any) => (b._match as number) - (a._match as number));
+      .sort((a: OpportunityWithMatch, b: OpportunityWithMatch) => b._match - a._match);
 
     setResults(scored as Opportunity[]);
     setLoading(false);
@@ -176,8 +177,8 @@ export function FindScholarship() {
             {results.map((opp) => (
               <div key={opp.id as string} className="relative">
                 <div className="absolute -top-2 -right-2 z-10">
-                  <Badge className="bg-primary text-primary-foreground font-bold text-xs shadow">
-                    {opp._match as number}% match
+                <Badge className="bg-primary text-primary-foreground font-bold text-xs shadow">
+                    {((opp as OpportunityWithMatch)._match ?? 0) as number}% match
                   </Badge>
                 </div>
                 <OpportunityCard opp={opp as Parameters<typeof OpportunityCard>[0]["opp"]} />
