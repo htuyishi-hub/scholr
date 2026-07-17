@@ -1,37 +1,22 @@
 
-# Railway multi-service config (deploy frontend + backend together)
+# Railway config
+# NOTE: Railway TOML does not support the YAML-like `services:` array used above.
+# This file is kept minimal so the Railway config parser succeeds.
 
-services:
-  - name: scholarship-api
-    type: web
-    build:
-      command: "pnpm install --frozen-lockfile && pnpm -r --filter @workspace/api-server run build"
-    start:
-      command: "cd artifacts/api-server && pnpm start"
-    healthcheck:
-      path: /api/healthz
-      intervalSeconds: 10
-      timeoutSeconds: 5
-      failureThreshold: 3
-    env:
-      - key: NODE_ENV
-        value: production
+[build]
+command = "pnpm install --frozen-lockfile && pnpm -r --filter @workspace/api-server run build"
 
-  - name: scholarship-web
-    type: web
-    build:
-      command: "cd artifacts/scholr && pnpm install --frozen-lockfile && pnpm run build"
-    start:
-      command: "cd artifacts/scholr && npx --yes serve -s dist/public -l $PORT --no-clipboard"
-    healthcheck:
-      path: /
-      intervalSeconds: 10
-      timeoutSeconds: 5
-      failureThreshold: 3
-    env:
-      - key: NODE_ENV
-        value: production
-      - key: VITE_API_BASE_URL
-        value: "https://scholarship-api.up.railway.app"
+[start]
+command = "cd artifacts/api-server && pnpm start"
+
+[healthcheck]
+path = "/api/healthz"
+intervalSeconds = 10
+timeoutSeconds = 5
+failureThreshold = 3
+
+[env]
+NODE_ENV = "production"
+
 
 
