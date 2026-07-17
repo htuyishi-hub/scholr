@@ -16,7 +16,12 @@ export const pool: pg.Pool = databaseUrl
   ? new Pool({ connectionString: databaseUrl })
   : (null as any);
 
+// Keep `db` typed as non-null at compile time.
+// Runtime will still throw a clear error via `getDb()` if DATABASE_URL is missing.
 export const db = databaseUrl ? drizzle(pool, { schema }) : (drizzle((pool as any), { schema }) as any);
+
+
+
 
 
 export function getDb() {
