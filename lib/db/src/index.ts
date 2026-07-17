@@ -16,17 +16,28 @@ export const pool: pg.Pool = databaseUrl
   ? new Pool({ connectionString: databaseUrl })
   : (null as any);
 
-export const db = databaseUrl ? drizzle(pool, { schema }) : (null as any);
+export const db = databaseUrl ? drizzle(pool, { schema }) : (drizzle((pool as any), { schema }) as any);
+
 
 export function getDb() {
-  if (!databaseUrl || !pool || !db) {
+  // Re-read env at call time so container boot order / secret injection works.
+  const url = process.env.DATABASE_URL;
+  if (!url) {
     throw new Error(
       "DATABASE_URL must be set (and DB must be reachable). Did you forget to provision a database?",
     );
   }
+
+  // If pool/db were created with a missing env var at module init time,
+  // accessing them would still be broken. Throw a clear error instead.
+  if (!pool || !db) {
+    throw new Error(
+      "Database is not initialized. Did you provision DATABASE_URL before starting the server?",
+    );
+  }
+
   return db;
 }
 
-
-
 export * from "./schema";
+
