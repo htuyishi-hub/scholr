@@ -8,13 +8,17 @@ const databaseUrl = process.env.DATABASE_URL;
 
 // IMPORTANT:
 // Railway may boot the API container before a DB is provisioned or before env vars are wired.
-// Do not hard-fail at module import time, otherwise the entire server crashes.
-// Instead, create the DB objects lazily and throw only when used.
-export const pool = databaseUrl ? new Pool({ connectionString: databaseUrl }) : null;
+// Avoid hard-failing at module import time (otherwise the whole server crashes).
+// But keep `db` typed as non-null so `tsc --noEmit` continues to pass.
+// If DB is missing, accessing DB must throw with a clear runtime error.
 
-export const db = pool ? drizzle(pool, { schema }) : null;
+export const pool: pg.Pool = databaseUrl
+  ? new Pool({ connectionString: databaseUrl })
+  : (null as any);
 
-function assertDbAvailable() {
+export const db = databaseUrl ? drizzle(pool, { schema }) : (null as any);
+
+export function getDb() {
   if (!databaseUrl || !pool || !db) {
     throw new Error(
       "DATABASE_URL must be set (and DB must be reachable). Did you forget to provision a database?",
@@ -23,7 +27,6 @@ function assertDbAvailable() {
   return db;
 }
 
-export const getDb = () => assertDbAvailable();
 
 
 export * from "./schema";
