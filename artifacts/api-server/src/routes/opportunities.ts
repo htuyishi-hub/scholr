@@ -109,14 +109,14 @@ router.get("/", async (req, res) => {
       .offset(offset);
 
     // Load authors
-    const authorIds = [...new Set(opps.map((o) => o.authorId).filter(Boolean))] as string[];
+    const authorIds = [...new Set(opps.map((o: Record<string, unknown>) => o.authorId).filter(Boolean))] as string[];
     const authors =
       authorIds.length > 0
         ? await db.select().from(usersTable).where(inArray(usersTable.id, authorIds))
         : [];
-    const authorMap = Object.fromEntries(authors.map((a) => [a.id, a]));
+    const authorMap = Object.fromEntries(authors.map((a: Record<string, unknown>) => [a.id as string, a]));
 
-    const items = opps.map((o) => mapOpp(o as Record<string, unknown>, o.authorId ? authorMap[o.authorId] as Record<string, unknown> : null));
+    const items = opps.map((o: Record<string, unknown>) => mapOpp(o, o.authorId ? authorMap[o.authorId as string] as Record<string, unknown> : null));
 
     res.json({
       items,
@@ -141,14 +141,14 @@ router.get("/featured", async (req, res) => {
       .orderBy(desc(opportunitiesTable.createdAt))
       .limit(3);
 
-    const authorIds = [...new Set(opps.map((o) => o.authorId).filter(Boolean))] as string[];
+    const authorIds = [...new Set(opps.map((o: Record<string, unknown>) => o.authorId).filter(Boolean))] as string[];
     const authors =
       authorIds.length > 0
         ? await db.select().from(usersTable).where(inArray(usersTable.id, authorIds))
         : [];
-    const authorMap = Object.fromEntries(authors.map((a) => [a.id, a]));
+    const authorMap = Object.fromEntries(authors.map((a: Record<string, unknown>) => [a.id as string, a]));
 
-    res.json(opps.map((o) => mapOpp(o as Record<string, unknown>, o.authorId ? authorMap[o.authorId] as Record<string, unknown> : null)));
+    res.json(opps.map((o: Record<string, unknown>) => mapOpp(o, o.authorId ? authorMap[o.authorId as string] as Record<string, unknown> : null)));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -430,7 +430,7 @@ router.get("/:id/related", async (req, res) => {
       .orderBy(desc(opportunitiesTable.createdAt))
       .limit(3);
 
-    res.json(related.map((o) => mapOpp(o as Record<string, unknown>, null)));
+    res.json(related.map((o: Record<string, unknown>) => mapOpp(o, null)));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

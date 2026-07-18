@@ -20,7 +20,7 @@ const SETTING_KEYS = [
 
 async function getSettingsMap(): Promise<Record<string, string>> {
   const rows = await db.select().from(settingsTable);
-  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  return Object.fromEntries(rows.map((r: Record<string, unknown>) => [r.key as string, r.value as string]));
 }
 
 // GET /api/settings

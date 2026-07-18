@@ -27,7 +27,7 @@ router.get("/", async (req, res) => {
   try {
     const users = await db.select().from(usersTable).orderBy(usersTable.createdAt);
     const result = await Promise.all(
-      users.map(async (u) => {
+      users.map(async (u: typeof usersTable.$inferSelect) => {
         const [{ count }] = await db
           .select({ count: sql<number>`count(*)::int` })
           .from(opportunitiesTable)

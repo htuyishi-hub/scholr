@@ -46,7 +46,7 @@ router.get("/jobs", async (req, res) => {
       .limit(pageSize)
       .offset(offset);
 
-    res.json(jobs.map((j) => mapJob(j as Record<string, unknown>)));
+    res.json(jobs.map((j: Record<string, unknown>) => mapJob(j)));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal error" });
@@ -109,7 +109,7 @@ router.get("/jobs/admin/all", async (req, res) => {
     const jobs = status
       ? await db.select().from(jobsTable).where(eq(jobsTable.status, status)).orderBy(desc(jobsTable.createdAt))
       : await db.select().from(jobsTable).orderBy(desc(jobsTable.createdAt));
-    res.json(jobs.map((j) => mapJob(j as Record<string, unknown>)));
+    res.json(jobs.map((j: Record<string, unknown>) => mapJob(j)));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal error" });
