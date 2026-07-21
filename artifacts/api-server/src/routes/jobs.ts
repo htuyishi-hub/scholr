@@ -5,10 +5,10 @@ import { getUserIdFromToken } from "../lib/auth.js";
 
 const router = Router();
 
-function getAdminId(req: import("express").Request): string | null {
+async function getAdminId(req: import("express").Request): Promise<string | null> {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) return null;
-  return getUserIdFromToken(auth.slice(7)) ?? null;
+  return (await getUserIdFromToken(auth.slice(7))) ?? null;
 }
 
 function toISO(d: unknown): string | null {
@@ -102,7 +102,7 @@ router.post("/jobs/submit", async (req, res) => {
 
 // GET /api/jobs/admin/all — admin gets all jobs
 router.get("/jobs/admin/all", async (req, res) => {
-  const adminId = getAdminId(req);
+  const adminId = await getAdminId(req);
   if (!adminId) { res.status(401).json({ error: "Not authenticated" }); return; }
   try {
     const { status } = req.query as { status?: "pending" | "published" | "rejected" | "expired" };
@@ -118,7 +118,7 @@ router.get("/jobs/admin/all", async (req, res) => {
 
 // PUT /api/jobs/admin/:id — admin updates a job
 router.put("/jobs/admin/:id", async (req, res) => {
-  const adminId = getAdminId(req);
+  const adminId = await getAdminId(req);
   if (!adminId) { res.status(401).json({ error: "Not authenticated" }); return; }
   try {
     const body = req.body as Record<string, unknown>;
@@ -149,7 +149,7 @@ router.put("/jobs/admin/:id", async (req, res) => {
 
 // DELETE /api/jobs/admin/:id — admin deletes a job
 router.delete("/jobs/admin/:id", async (req, res) => {
-  const adminId = getAdminId(req);
+  const adminId = await getAdminId(req);
   if (!adminId) { res.status(401).json({ error: "Not authenticated" }); return; }
   try {
     await db.delete(jobsTable).where(eq(jobsTable.id, req.params.id));

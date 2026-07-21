@@ -6,18 +6,18 @@ import type { DocumentSlot } from "@workspace/db";
 
 const router = Router();
 
-function getStudentId(req: import("express").Request): string | null {
+async function getStudentId(req: import("express").Request): Promise<string | null> {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) return null;
   const token = auth.slice(7);
-  return getUserIdFromToken(`student:${token}`) ?? null;
+  return (await getUserIdFromToken(`student:${token}`)) ?? null;
 }
 
-function getAdminId(req: import("express").Request): string | null {
+async function getAdminId(req: import("express").Request): Promise<string | null> {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) return null;
   const token = auth.slice(7);
-  return getUserIdFromToken(token) ?? null;
+  return (await getUserIdFromToken(token)) ?? null;
 }
 
 function toISO(d: unknown): string | null {
@@ -58,7 +58,7 @@ function mapApp(
 
 // POST /api/applications — student submits a managed application
 router.post("/", async (req, res) => {
-  const studentId = getStudentId(req);
+  const studentId = await getStudentId(req);
   if (!studentId) { res.status(401).json({ error: "Not authenticated as student" }); return; }
   const { opportunityId, motivation, experience, contactPreference, whatsappNumber, contactTime, concerns } =
     req.body as Record<string, string>;
@@ -89,7 +89,7 @@ router.post("/", async (req, res) => {
 
 // PUT /api/applications/:id/documents — student uploads documents
 router.put("/:id/documents", async (req, res) => {
-  const studentId = getStudentId(req);
+  const studentId = await getStudentId(req);
   if (!studentId) { res.status(401).json({ error: "Not authenticated as student" }); return; }
   try {
     const [app] = await db.select().from(managedApplicationsTable).where(eq(managedApplicationsTable.id, req.params.id)).limit(1);
@@ -98,14 +98,12 @@ router.put("/:id/documents", async (req, res) => {
     const { documents } = req.body as { documents: DocumentSlot[] };
     if (!Array.isArray(documents)) { res.status(400).json({ error: "documents must be an array" }); return; }
 
-    // Check if all required docs are uploaded → auto-advance status to documents_collection
     const allRequiredUploaded = documents.filter((d) => d.required).every((d) => !!d.objectPath);
     const updates: Record<string, unknown> = {
       documents,
       updatedAt: new Date(),
     };
 
-    // Auto-advance status if still pending_review or profile_check
     if (allRequiredUploaded && (app.status === "pending_review" || app.status === "profile_check")) {
       updates.status = "documents_collection";
       const timeline = (app.timeline as { date: string; event: string }[]) || [];
@@ -127,13 +125,13 @@ router.put("/:id/documents", async (req, res) => {
 
 // GET /api/applications — student gets their applications
 router.get("/", async (req, res) => {
-  const studentId = getStudentId(req);
+  const studentId = await getStudentId(req);
   if (!studentId) { res.status(401).json({ error: "Not authenticated as student" }); return; }
   try {
     const apps = await db.select().from(managedApplicationsTable)
       .where(eq(managedApplicationsTable.studentId, studentId))
       .orderBy(desc(managedApplicationsTable.createdAt));
-const enriched = await Promise.all(
+    const enriched = await Promise.all(
       apps.map(async (app: Record<string, unknown>) => {
         const [opp] = await db
           .select()
@@ -152,7 +150,7 @@ const enriched = await Promise.all(
 
 // GET /api/applications/:id — student gets a specific application
 router.get("/:id", async (req, res) => {
-  const studentId = getStudentId(req);
+  const studentId = await getStudentId(req);
   if (!studentId) { res.status(401).json({ error: "Not authenticated as student" }); return; }
   try {
     const [app] = await db.select().from(managedApplicationsTable).where(eq(managedApplicationsTable.id, req.params.id)).limit(1);
@@ -167,7 +165,7 @@ router.get("/:id", async (req, res) => {
 
 // GET /api/applications/admin/all — admin gets all applications
 router.get("/admin/all", async (req, res) => {
-  const adminId = getAdminId(req);
+  const adminId = await getAdminId(req);
   if (!adminId) { res.status(401).json({ error: "Not authenticated as admin" }); return; }
   try {
     const { status } = req.query as { status?: string };
@@ -200,7 +198,7 @@ router.get("/admin/all", async (req, res) => {
             .orderBy(desc(managedApplicationsTable.createdAt))
     );
 
-const enriched = await Promise.all(
+    const enriched = await Promise.all(
       apps.map(async (app: Record<string, unknown>) => {
         const [student] = await db
           .select()
@@ -241,7 +239,7 @@ const enriched = await Promise.all(
 
 // GET /api/applications/admin/:id — admin gets a specific application detail
 router.get("/admin/:id", async (req, res) => {
-  const adminId = getAdminId(req);
+  const adminId = await getAdminId(req);
   if (!adminId) { res.status(401).json({ error: "Not authenticated as admin" }); return; }
   try {
     const [app] = await db.select().from(managedApplicationsTable).where(eq(managedApplicationsTable.id, req.params.id)).limit(1);
@@ -260,7 +258,7 @@ router.get("/admin/:id", async (req, res) => {
 
 // PUT /api/applications/admin/:id — admin updates an application
 router.put("/admin/:id", async (req, res) => {
-  const adminId = getAdminId(req);
+  const adminId = await getAdminId(req);
   if (!adminId) { res.status(401).json({ error: "Not authenticated as admin" }); return; }
   try {
     const [existing] = await db.select().from(managedApplicationsTable).where(eq(managedApplicationsTable.id, req.params.id)).limit(1);

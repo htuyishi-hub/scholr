@@ -239,7 +239,7 @@ router.post("/", async (req, res) => {
   let authorId: string | undefined;
   if (auth?.startsWith("Bearer ")) {
     const { getUserIdFromToken: getUser } = await import("../lib/auth.js");
-    authorId = getUser(auth.slice(7));
+    authorId = await getUser(auth.slice(7));
   }
 
   try {
@@ -251,7 +251,6 @@ router.post("/", async (req, res) => {
     }
 
     let slug = slugify(title);
-    // Ensure unique slug
     const existing = await db
       .select({ slug: opportunitiesTable.slug })
       .from(opportunitiesTable)
@@ -287,7 +286,6 @@ router.post("/", async (req, res) => {
       })
       .returning();
 
-    // Log activity
     if (authorId) {
       const [author] = await db.select().from(usersTable).where(eq(usersTable.id, authorId)).limit(1);
       if (author) {
@@ -349,10 +347,9 @@ router.put("/:id", async (req, res) => {
       return;
     }
 
-    // Log activity
     const auth = req.headers.authorization;
     if (auth?.startsWith("Bearer ")) {
-      const userId = getUserIdFromToken(auth.slice(7));
+      const userId = await getUserIdFromToken(auth.slice(7));
       if (userId) {
         const [author] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
         if (author) {

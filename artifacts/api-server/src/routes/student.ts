@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { db, studentProfilesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { hashPassword, verifyPassword, generateToken, storeToken, getUserIdFromToken, removeToken } from "../lib/auth.js";
+import { hashPassword, verifyPassword, generateToken, getUserIdFromToken, removeToken } from "../lib/auth.js";
+
 
 const router = Router();
+
 
 function toISO(d: unknown): string | null {
   if (!d) return null;
@@ -42,9 +44,10 @@ router.post("/register", async (req, res) => {
       .insert(studentProfilesTable)
       .values({ email: email.toLowerCase().trim(), name, passwordHash })
       .returning();
-    const token = generateToken();
-    storeToken(`student:${token}`, student.id);
+    const token = await generateToken(student.id, "student");
+    // stateless JWT (no server-side storage)
     res.status(201).json({ student: safeStudent(student), token });
+
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -68,9 +71,10 @@ router.post("/login", async (req, res) => {
       res.status(401).json({ error: "Invalid email or password" });
       return;
     }
-    const token = generateToken();
-    storeToken(`student:${token}`, student.id);
+    const token = await generateToken(student.id, "student");
+    // stateless JWT (no server-side storage)
     res.json({ student: safeStudent(student), token });
+
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -107,9 +111,10 @@ router.post("/auth0", async (req, res) => {
         .returning();
     }
 
-    const token = generateToken();
-    storeToken(`student:${token}`, student.id);
+    const token = await generateToken(student.id, "student");
+    // stateless JWT (no server-side storage)
     res.json({ student: safeStudent(student), token });
+
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -133,7 +138,7 @@ router.get("/me", async (req, res) => {
     return;
   }
   const token = auth.slice(7);
-  const studentId = getUserIdFromToken(`student:${token}`);
+  const studentId = await getUserIdFromToken(`student:${token}`);
   if (!studentId) {
     res.status(401).json({ error: "Invalid or expired token" });
     return;
@@ -163,7 +168,7 @@ router.put("/profile", async (req, res) => {
     return;
   }
   const token = auth.slice(7);
-  const studentId = getUserIdFromToken(`student:${token}`);
+  const studentId = await getUserIdFromToken(`student:${token}`);
   if (!studentId) {
     res.status(401).json({ error: "Invalid or expired token" });
     return;

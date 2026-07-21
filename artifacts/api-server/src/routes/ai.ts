@@ -3,16 +3,16 @@ import { getUserIdFromToken } from "../lib/auth.js";
 
 const router = Router();
 
-function getAdminId(req: import("express").Request): string | null {
+async function getAdminId(req: import("express").Request): Promise<string | null> {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) return null;
   const token = auth.slice(7);
-  return getUserIdFromToken(token) ?? null;
+  return (await getUserIdFromToken(token)) ?? null;
 }
 
 // POST /api/ai/generate-description
 router.post("/generate-description", async (req, res) => {
-  const adminId = getAdminId(req);
+  const adminId = await getAdminId(req);
   if (!adminId) {
     res.status(401).json({ error: "Not authenticated" });
     return;

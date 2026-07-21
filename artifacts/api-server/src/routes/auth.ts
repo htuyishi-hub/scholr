@@ -10,6 +10,7 @@ import {
   removeToken,
 } from "../lib/auth.js";
 
+
 const router = Router();
 
 // POST /api/auth/login
@@ -36,8 +37,9 @@ router.post("/login", async (req, res) => {
       .set({ lastActive: new Date() })
       .where(eq(usersTable.id, user.id));
 
-    const token = generateToken();
-    storeToken(token, user.id);
+    const token = await generateToken(user.id, "admin");
+    // tokens are stateless (JWT), no server-side storage
+
 
     const { passwordHash: _, ...safeUser } = user;
     const postsCount = 0;
@@ -53,11 +55,9 @@ router.post("/login", async (req, res) => {
 });
 
 // POST /api/auth/logout
+// POST /api/auth/logout
 router.post("/logout", async (req, res) => {
-  const auth = req.headers.authorization;
-  if (auth?.startsWith("Bearer ")) {
-    removeToken(auth.slice(7));
-  }
+  // Stateless JWT: client should simply drop the token.
   res.json({ message: "Logged out" });
 });
 
@@ -69,17 +69,19 @@ router.get("/me", async (req, res) => {
     return;
   }
   const token = auth.slice(7);
-  const userId = getUserIdFromToken(token);
+  const userId = await getUserIdFromToken(token);
   if (!userId) {
     res.status(401).json({ error: "Invalid or expired token" });
     return;
   }
+
   try {
     const [user] = await db
       .select()
       .from(usersTable)
       .where(eq(usersTable.id, userId))
       .limit(1);
+
     if (!user) {
       res.status(401).json({ error: "User not found" });
       return;
