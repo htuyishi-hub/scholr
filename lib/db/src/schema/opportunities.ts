@@ -19,6 +19,7 @@ export const opportunitiesTable = pgTable("opportunities", {
   description: text("description"),
   content: text("content"),
   coverImage: text("cover_image"),
+  galleryImages: text("gallery_images").array().default([]),
   category: text("category"),
   country: text("country"),
   fundingType: text("funding_type"),

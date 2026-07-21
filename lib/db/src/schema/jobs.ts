@@ -11,8 +11,11 @@ export const jobsTable = pgTable("jobs", {
   location: text("location"),
   jobType: text("job_type"), // full-time, part-time, contract, internship, remote
   category: text("category"), // Technology, Health, Education, Finance, NGO, Government, etc.
-  description: text("description"),
+description: text("description"),
+  content: text("content"),
   requirements: text("requirements"),
+  coverImage: text("cover_image"),
+  galleryImages: text("gallery_images").array(),
   applicationLink: text("application_link"),
   contactEmail: text("contact_email"),
   salary: text("salary"),
