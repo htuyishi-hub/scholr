@@ -1,34 +1,39 @@
-# TODO — Scraper + Admin Approval Improvements
+# TODO
 
-## Phase 1: Rich scraping (detail-page extraction)
-- [ ] Update `artifacts/api-server/src/lib/scraper.ts`:
-  - [ ] Add HTML sanitization + lightweight formatting preservation for scraped content.
-  - [ ] For each listing page item, fetch the detail page.
-  - [ ] Extract full main content (headings, paragraphs, lists) into `ScrapedResult.description` and/or `rawData`.
-  - [ ] Extract `img[src]` URLs into `ScrapedResult.rawData.images`.
-  - [ ] Extract specific apply links (and “official source”) and store in `ScrapedResult.applyLink` and `rawData.officialSourceUrl`.
-  - [ ] Repeat for both scholarships and jobs.
+## Completed
 
-## Phase 2: Persist full content on approval
-- [ ] Update `artifacts/api-server/src/routes/scraper.ts` approve handler:
-  - [ ] When approving scholarships, write full content into `opportunitiesTable.content` (HTML sanitized).
-  - [ ] Keep a short preview in `opportunitiesTable.description`.
-  - [ ] For jobs, store full extracted HTML into `jobsTable.description` (and requirements if extracted).
+### JWT Auth — Phase 1
+- [x] Add `jose` dependency to `artifacts/api-server/package.json`
+- [x] Update `artifacts/api-server/src/lib/auth.ts` to sign/verify JWT using `process.env.JWT_SECRET`
+- [x] Update `artifacts/api-server/src/routes/auth.ts` and `student.ts` to issue JWT
+- [x] Fix all async `getUserIdFromToken` call sites
+- [x] Verify build (`pnpm run build` succeeds)
 
-## Phase 3: Admin preview + edit
-- [ ] Update `artifacts/scholr/src/pages/admin/scraper-panel.tsx`:
-  - [ ] Extend UI model to show full sanitized HTML preview (and images grid).
-  - [ ] Add an “Official source” link.
-  - [ ] Allow admin edits for content and apply link.
+### Phase A — Scraper Pipeline Improvements (COMPLETE)
 
-## Phase 4: User experience
-- [ ] Verify public opportunity/job pages render `opportunities.content` and show apply button.
-- [ ] If needed, update React components to render stored HTML safely (sanitization already done server-side).
+#### Schema & Migration
+- [x] `lib/db/src/schema/scraped-items.ts` — Added content, plainText, coverImage, images[], confidence, scraperName, httpStatus, contentHash, lastModified (TIMESTAMPTZ), etag, extractionVersion, extractionMethod
+- [x] `lib/db/src/schema/opportunities.ts` — Added galleryImages[]
+- [x] `lib/db/src/schema/jobs.ts` — Added content, coverImage, galleryImages[]
+- [x] `scholr_migration_v2.sql` — All columns with defaults + 9 indexes
 
-## Phase 5: Jobs scraper parity
-- [ ] Ensure job approval creates consistent applicationLink + full description.
+#### Scraper Route — Fully Rewritten
+- [x] Rich content stored in staging (content, plainText, images[])
+- [x] Approval publishes full article content (not just description)
+- [x] Images as first-class data: coverImage + galleryImages[]
+- [x] DB transactions around approval
+- [x] Multi-level duplicate detection (sourceUrl → applyLink → normalized title)
+- [x] Clean slugs without timestamps (sequential -2, -3 suffixes)
+- [x] Richer statistics (GET /api/scraper/stats)
+- [x] Future auto-approval foundation (confidence field)
+- [x] New endpoints: GET /scraper/status, GET /scraper/items/:id, GET /scraper/stats
 
-## Phase 6: Testing
-- [ ] Run local scrape -> review pending items -> approve -> verify full rendering in user-facing pages.
-- [ ] Add basic smoke checks (no external calls in tests required).
+#### Scraper Directory — Plugin Architecture
+- [x] `types.ts` — Shared types, helpers, scrapeGenericList() factory
+- [x] `index.ts` — Orchestrator with runAllScrapers(), getSourceCount(), getScrapersByCategory()
+- [x] Scraper module files created (universities, government, scholarship-providers, aggregators, jobs, un-ngos, tech-fellowships)
 
+## Remaining
+- [ ] Implement scraper source functions in each scraper module file
+- [ ] Expand to 100+ sources as documented in the task
+- [ ] Update docs / environment variable notes
