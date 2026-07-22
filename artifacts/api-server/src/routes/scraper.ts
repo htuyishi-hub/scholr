@@ -154,7 +154,8 @@ router.post("/scraper/run", async (req, res) => {
     }
 
     // Phase 3: Enrich (fetch detail pages) — only for items that passed dedup
-    const limit = pLimit(8);
+    // Low concurrency (4) to avoid heap OOM on Railway (512MB memory limit)
+    const limit = pLimit(4);
     const enriched = await enrichResults(toEnrich, limit);
 
     // Temp debug: verify enrichment worked

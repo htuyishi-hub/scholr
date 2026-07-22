@@ -28,9 +28,7 @@
 - [x] Future auto-approval foundation (confidence field)
 - [x] New endpoints: GET /scraper/status, GET /scraper/items/:id, GET /scraper/stats
 
-#### Scraper Directory — Plugin Architecture
-- [x] `types.ts` — Shared types, helpers, scrapeGenericList() factory
-- [x] `index.ts` — Orchestrator with runAllScrapers(), getSourceCount(), getScrapersByCategory()
+
 - [x] Scraper module files created (universities, government, scholarship-providers, aggregators, jobs, un-ngos, tech-fellowships)
 
 ## Remaining
