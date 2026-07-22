@@ -1,6 +1,10 @@
 /**
  * Scraper orchestrator - combines all source categories and runs them with concurrency limiting.
  * This replaces the old runAllScrapers function in the old scraper.ts.
+ *
+ * runAllScrapers() returns only listing-phase results (title, sourceUrl, etc.).
+ * Callers should deduplicate then enrich with detailExtractor.enrichResults()
+ * before inserting into the database.
  */
 import pLimit from "p-limit";
 import type { ScraperConfig, ScrapedResult, ScraperResult } from "./types.js";
@@ -125,3 +129,6 @@ export function getScrapersByCategory(): Record<string, ScraperConfig[]> {
   }
   return grouped;
 }
+
+// Re-export the limiter factory so callers can use the same concurrency settings
+export { pLimit };

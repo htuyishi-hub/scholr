@@ -10,6 +10,7 @@ export interface ScrapedResult {
   content?: string;
   plainText?: string;
   images?: string[];
+  coverImage?: string | null;
   deadline?: string;
   country?: string;
   category?: string;

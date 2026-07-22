@@ -2,7 +2,10 @@ import { Router } from "express";
 import { db, scrapedItemsTable, opportunitiesTable, jobsTable } from "@workspace/db";
 import { eq, desc, like, sql } from "drizzle-orm";
 import { runAllScrapers, getSourceCount, getScrapersByCategory } from "../lib/scrapers/index.js";
+import { enrichResults } from "../lib/scrapers/detailExtractor.js";
+import pLimit from "p-limit";
 import { getUserIdFromToken } from "../lib/auth.js";
+import type { ScrapedResult } from "../lib/scrapers/types.js";
 
 const router = Router();
 
@@ -58,7 +61,7 @@ function createPreview(plainText?: string | null, maxChars = 200): string {
   if (!plainText) return "";
   const cleaned = plainText.replace(/\s+/g, " ").trim();
   if (cleaned.length <= maxChars) return cleaned;
-  return cleaned.slice(0, maxChars).replace(/\s+\S*$/, "").trim() + "…";
+  return cleaned.slice(0, maxChars).replace(/\s+\S*$/, "").trim() + "\u2026";
 }
 
 /**
@@ -130,14 +133,46 @@ router.post("/scraper/run", async (req, res) => {
   try {
     const { results, summary } = await runAllScrapers();
 
-    let added = 0;
-    let duplicates = 0;
-    let failed = 0;
-
+    // Phase 1: In-memory dedup by sourceUrl (within this run)
+    const seenUrls = new Set<string>();
+    const uniqueResults: ScrapedResult[] = [];
     for (const item of results) {
-      const dup = await isDuplicate(item.sourceUrl, item.applyLink, item.title);
-      if (dup) { duplicates++; continue; }
+      const key = item.sourceUrl;
+      if (seenUrls.has(key)) continue;
+      seenUrls.add(key);
+      uniqueResults.push(item);
+    }
+    const withinRunDeduped = results.length - uniqueResults.length;
 
+    // Phase 2: DB-level duplicate check — only unique URLs survive
+    const toEnrich: ScrapedResult[] = [];
+    let dbDuplicates = 0;
+    for (const item of uniqueResults) {
+      const dup = await isDuplicate(item.sourceUrl, item.applyLink, item.title);
+      if (dup) { dbDuplicates++; continue; }
+      toEnrich.push(item);
+    }
+
+    // Phase 3: Enrich (fetch detail pages) — only for items that passed dedup
+    const limit = pLimit(8);
+    const enriched = await enrichResults(toEnrich, limit);
+
+    // Temp debug: verify enrichment worked
+    if (enriched.length > 0) {
+      console.log({
+        sampleTitle: enriched[0]?.title,
+        hasContent: !!enriched[0]?.content,
+        imageCount: enriched[0]?.images?.length ?? 0,
+        hasCover: !!enriched[0]?.coverImage,
+      });
+    }
+
+    // Phase 4: Insert enriched items
+    let added = 0;
+    let insertFailed = 0;
+    const duplicates = withinRunDeduped + dbDuplicates;
+
+    for (const item of enriched) {
       try {
         await db.insert(scrapedItemsTable).values({
           source: item.source,
@@ -148,7 +183,7 @@ router.post("/scraper/run", async (req, res) => {
           description: item.plainText ? createPreview(item.plainText) : (item.description ?? null),
           content: item.content ?? null,
           plainText: item.plainText ?? null,
-          coverImage: item.images?.[0] ?? null,
+          coverImage: item.coverImage ?? (item.images?.[0] ?? null),
           images: item.images ?? null,
           deadline: item.deadline ?? null,
           country: item.country ?? null,
@@ -162,7 +197,7 @@ router.post("/scraper/run", async (req, res) => {
         });
         added++;
       } catch {
-        failed++;
+        insertFailed++;
       }
     }
 
@@ -173,7 +208,7 @@ router.post("/scraper/run", async (req, res) => {
       total: results.length,
       added,
       duplicates,
-      failed: failed + summary.errors.length,
+      failed: insertFailed + summary.errors.length,
       pending: added,
       approved: 0,
       rejected: 0,
