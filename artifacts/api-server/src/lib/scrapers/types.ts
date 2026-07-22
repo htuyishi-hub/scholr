@@ -49,6 +49,7 @@ export interface ScraperResult {
 }
 
 const TIMEOUT_MS = 15000;
+const MAX_HTML_BYTES = 500_000; // 500KB — enough for article content, avoids OOM on huge pages
 
 export async function fetchHtml(url: string): Promise<string | null> {
   try {
@@ -62,8 +63,27 @@ export async function fetchHtml(url: string): Promise<string | null> {
       },
     });
     clearTimeout(tid);
-    if (!res.ok) return null;
-    return res.text();
+    if (!res.ok || !res.body) return null;
+
+    // Stream-read only the first MAX_HTML_BYTES to avoid OOM on huge pages
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    while (total < MAX_HTML_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.length;
+      if (total >= MAX_HTML_BYTES) {
+        reader.cancel();
+        break;
+      }
+    }
+
+    const decoder = new TextDecoder();
+    const parts = chunks.map((c) => decoder.decode(c, { stream: true }));
+    parts.push(decoder.decode()); // flush
+    return parts.join("");
   } catch {
     return null;
   }
@@ -129,6 +149,13 @@ export async function fetchDetailPage(url: string): Promise<string | null> {
   return fetchHtml(url);
 }
 
+/**
+ * Extract the main content block from a full HTML page.
+ *
+ * Uses a scoring system: candidates with many <p> tags (article content)
+ * are preferred over those with many <a>/<div> tags (navigation/listing grids).
+ * This avoids picking up the teaser grid on listing pages like "Programme A bis Z".
+ */
 export function extractMainContent(html: string): string {
   const candidates: string[] = [];
   const reSelectors: Array<RegExp> = [
@@ -140,11 +167,36 @@ export function extractMainContent(html: string): string {
   ];
   for (const re of reSelectors) {
     const m = html.match(re);
-    if (m?.[1]) candidates.push(m[1]);
+    if (m) {
+      // Groups vary by regex; pick the first non-undefined capture group
+      const content = m[1] || m[2] || "";
+      if (content.length > 100) candidates.push(content);
+    }
   }
-  const pFallback = html.match(/(<p[\s\S]*?>[\s\S]*?<\/p>){1,8}/i)?.[0];
-  if (pFallback) candidates.push(pFallback);
-  return candidates.sort((a, b) => b.length - a.length)[0] ?? html;
+
+  // Paragraph run fallback: up to 15 consecutive paragraphs (real article pages have many)
+  const pRun = html.match(/(<p[\s\S]*?>[\s\S]*?<\/p>\s*){3,15}/i);
+  if (pRun && pRun[0].length > 100) candidates.push(pRun[0]);
+
+  // Score candidates: prefer those with high <p> density (real article content)
+  // over listing grids (many <a>/<div> tags, few <p> tags)
+  const scored = candidates.map((c) => {
+    const pCount = (c.match(/<p[\s\S]*?<\/p>/gi) || []).length;
+    const linkCount = (c.match(/<a[\s\S]*?<\/a>/gi) || []).length;
+    const divCount = (c.match(/<div[\s\S]*?<\/div>/gi) || []).length;
+    // Article content scores high; listing grids with zero <p> tags score low/negative
+    const score = pCount * 10 - linkCount * 2 - divCount;
+    return { content: c, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+
+  if (scored.length > 0 && scored[0].score > 5) return scored[0].content;
+
+  // Ultra fallback: any paragraph run (even just 1-2 paragraphs)
+  const anyP = html.match(/(<p[\s\S]*?>[\s\S]*?<\/p>\s*){1,50}/i);
+  if (anyP) return anyP[0];
+
+  return html;
 }
 
 export function sanitizeHtml(input: string): string {
@@ -195,7 +247,7 @@ export function extractImages(html: string): string[] {
 export function makeDescriptionFromText(plainText: string, maxChars = 220): string {
   const cleaned = plainText.replace(/\s+/g, " ").trim();
   if (cleaned.length <= maxChars) return cleaned;
-  return cleaned.slice(0, maxChars).replace(/\s+\S*$/, "").trim() + "…";
+  return cleaned.slice(0, maxChars).replace(/\s+\S*$/, "").trim() + "\u2026";
 }
 
 /**
