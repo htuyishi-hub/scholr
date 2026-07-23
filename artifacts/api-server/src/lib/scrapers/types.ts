@@ -150,13 +150,43 @@ export async function fetchDetailPage(url: string): Promise<string | null> {
 }
 
 /**
+ * Detect if a HTML page is a listing/overview page rather than a single detail page.
+ * Listing pages contain grids of teaser cards with many links and repeating patterns.
+ */
+export function isListingPage(html: string): boolean {
+  const listingIndicators: RegExp[] = [
+    /overview__grid/i,
+    /grid--33-33-33/i,
+    /teaser__headline/i,
+    /teaser__image/i,
+    /teaser__content-wrap/i,
+    /Programme\s+A\s+bis\s+Z/i,
+    /overview__sort/i,
+    /listing-page/i,
+    /class="[^"]*overview[^"]*"/i,
+    /class="[^"]*teaser[^"]*"/i,
+    /class="[^"]*listing[^"]*"/i,
+  ];
+  let matchCount = 0;
+  for (const pattern of listingIndicators) {
+    if (pattern.test(html)) matchCount++;
+  }
+  return matchCount >= 3;
+}
+
+/**
  * Extract the main content block from a full HTML page.
  *
  * Uses a scoring system: candidates with many <p> tags (article content)
  * are preferred over those with many <a>/<div> tags (navigation/listing grids).
- * This avoids picking up the teaser grid on listing pages like "Programme A bis Z".
+ * If the page looks like a listing page (many teaser cards), returns empty string
+ * so the caller can fall back to preserving the original scrape data.
  */
 export function extractMainContent(html: string): string {
+  // If this is clearly a listing/overview page, return empty to signal
+  // "don't overwrite good scrape data"
+  if (isListingPage(html)) return "";
+
   const candidates: string[] = [];
   const reSelectors: Array<RegExp> = [
     /<article[^>]*>([\s\S]*?)<\/article>/i,
@@ -196,7 +226,7 @@ export function extractMainContent(html: string): string {
   const anyP = html.match(/(<p[\s\S]*?>[\s\S]*?<\/p>\s*){1,50}/i);
   if (anyP) return anyP[0];
 
-  return html;
+  return "";
 }
 
 export function sanitizeHtml(input: string): string {

@@ -8,6 +8,8 @@
  * that will actually be inserted.
  *
  * Fault-tolerant: if extraction fails, the original item is kept.
+ * Listing/overview pages (detected by isListingPage) are skipped
+ * to preserve original scrape data.
  */
 import type { ScrapedResult } from "./types.js";
 import {
@@ -46,6 +48,12 @@ export async function extractDetailPage(item: ScrapedResult): Promise<Partial<Sc
       if (!html) continue;
 
       const mainContent = extractMainContent(html);
+
+      // If extractMainContent returns empty string, the page was detected
+      // as a listing/overview page (e.g. "Programme A bis Z" grid).
+      // Skip enrichment to preserve the original scrape data.
+      if (!mainContent) continue;
+
       const sanitized = sanitizeHtml(mainContent);
       const plainText = htmlToPlainText(sanitized);
       const images = extractImages(mainContent);
