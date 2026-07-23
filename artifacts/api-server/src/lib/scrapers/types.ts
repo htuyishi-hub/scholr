@@ -150,6 +150,32 @@ export async function fetchDetailPage(url: string): Promise<string | null> {
 }
 
 /**
+ * Detect if a HTML page is a JS-rendered SPA shell (Vue, React, Angular) where
+ * the actual content is loaded client-side. These pages contain placeholder
+ * elements with messages like "This content has not yet been loaded" and
+ * framework-specific data- attributes.
+ */
+export function isSpaPlaceholderPage(html: string): boolean {
+  const spaIndicators: RegExp[] = [
+    /data-v-[a-f0-9]+/i,
+    /data-reactroot/i,
+    /data-reactid/i,
+    /ng-version/i,
+    /qa-module-placeholder/i,
+    /data-print-placeholder/i,
+    /content has not yet been loaded/i,
+    /placeholder@print/i,
+    /u-placeholder@print/i,
+    /loading-text\s+pulse-opacity-animation/i,
+  ];
+  let matchCount = 0;
+  for (const pattern of spaIndicators) {
+    if (pattern.test(html)) matchCount++;
+  }
+  return matchCount >= 3;
+}
+
+/**
  * Detect if a HTML page is a listing/overview page rather than a single detail page.
  * Listing pages contain grids of teaser cards with many links and repeating patterns.
  */
@@ -181,11 +207,16 @@ export function isListingPage(html: string): boolean {
  * are preferred over those with many <a>/<div> tags (navigation/listing grids).
  * If the page looks like a listing page (many teaser cards), returns empty string
  * so the caller can fall back to preserving the original scrape data.
+ * If the page is an unrendered SPA shell (Vue/React/Angular), also returns empty string.
  */
 export function extractMainContent(html: string): string {
   // If this is clearly a listing/overview page, return empty to signal
   // "don't overwrite good scrape data"
   if (isListingPage(html)) return "";
+
+  // If this is an unrendered JS SPA shell (Vue/React/Angular with placeholders),
+  // return empty to preserve original scrape data
+  if (isSpaPlaceholderPage(html)) return "";
 
   const candidates: string[] = [];
   const reSelectors: Array<RegExp> = [
