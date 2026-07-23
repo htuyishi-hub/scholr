@@ -201,6 +201,110 @@ export function isListingPage(html: string): boolean {
 }
 
 /**
+ * Extract text from SPA placeholder pages that have server-rendered text
+ * hidden in utility classes like u-visibility-hidden or js-dynamic-content.
+ * Also harvests OG meta tags for images and descriptions.
+ *
+ * Returns fallback content: description, plainText, images, coverImage.
+ */
+export function extractSpaFallback(html: string): {
+  content: string;
+  plainText: string;
+  images: string[];
+  coverImage: string | null;
+} {
+  const result: {
+    content: string;
+    plainText: string;
+    images: string[];
+    coverImage: string | null;
+  } = {
+    content: "",
+    plainText: "",
+    images: [],
+    coverImage: null,
+  };
+
+  // 1. Collect visible text from js-dynamic-content / u-visibility-hidden spans.
+  //    These contain real article text but are visually hidden until Vue hydrates.
+  const hiddenTexts: string[] = [];
+  const dynamicRe = /<span[^>]*class="[^"]*js-dynamic-content[^"]*"[^>]*>[\s\S]*?<\/span>/gi;
+  let dm: RegExpExecArray | null;
+  while ((dm = dynamicRe.exec(html)) !== null) {
+    const inner = dm[0].replace(/<[^>]+>/g, "").trim();
+    if (inner && inner.length > 5) hiddenTexts.push(inner);
+  }
+
+  if (hiddenTexts.length > 0) {
+    const combined = hiddenTexts.join("\n\n");
+    result.plainText = combined;
+    result.content = "<p>" + hiddenTexts.join("</p>\n<p>") + "</p>";
+  }
+
+  // 2. Harvest OG meta tags
+  const ogTitle = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"[^>]*>/i);
+  const ogDesc = html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"[^>]*>/i);
+  const ogImage = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"[^>]*>/i);
+
+  if (ogTitle && ogTitle[1].trim()) {
+    const titleText = ogTitle[1].trim();
+    if (result.plainText && !result.plainText.includes(titleText)) {
+      result.plainText = titleText + "\n\n" + result.plainText;
+      result.content = "<h2>" + titleText + "</h2>\n" + result.content;
+    } else if (!result.plainText) {
+      result.plainText = titleText;
+      result.content = "<p>" + titleText + "</p>";
+    }
+  }
+
+  if (ogDesc && ogDesc[1].trim().length > 10) {
+    const descText = ogDesc[1].trim();
+    if (result.plainText && !result.plainText.includes(descText)) {
+      result.plainText += "\n\n" + descText;
+      result.content += "\n<p>" + descText + "</p>";
+    } else if (!result.plainText) {
+      result.plainText = descText;
+      result.content = "<p>" + descText + "</p>";
+    }
+  }
+
+  if (ogImage && ogImage[1].trim().length > 10) {
+    const imgSrc = ogImage[1].trim();
+    result.images.push(imgSrc);
+    result.coverImage = imgSrc;
+  }
+
+  // 3. Also harvest images from <noscript> fallback and lazy attrs
+  const spaImages = extractImages(html);
+  for (const img of spaImages) {
+    if (!result.images.includes(img)) {
+      result.images.push(img);
+    }
+  }
+  if (!result.coverImage && result.images.length > 0) {
+    result.coverImage = result.images[0];
+  }
+
+  // 4. Try to extract visible headings (<h1>-<h3>) for extra content
+  const headingRe = /<h[1-3][^>]*>[\s\S]*?<\/h[1-3]>/gi;
+  let hm: RegExpExecArray | null;
+  const headings: string[] = [];
+  while ((hm = headingRe.exec(html)) !== null) {
+    const text = hm[0].replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
+    if (text.length > 3) headings.push(text);
+  }
+  if (headings.length > 0) {
+    const headingText = headings.slice(0, 3).join("\n");
+    if (!result.plainText.includes(headingText.slice(0, 30))) {
+      result.plainText = headingText + "\n\n" + result.plainText;
+      result.content = "<h2>" + headings.slice(0, 3).join("</h2>\n<h2>") + "</h2>\n" + result.content;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Extract the main content block from a full HTML page.
  *
  * Uses a scoring system: candidates with many <p> tags (article content)
@@ -313,7 +417,7 @@ export function extractImages(html: string): string[] {
   // 2. Lazy-loaded images: <img data-src="..."> or data-lazy-src, data-original
   const lazyAttrs = ["data-src", "data-lazy-src", "data-original", "data-lazy", "data-srcset"];
   for (const attr of lazyAttrs) {
-    const re = new RegExp(`<img[^>]+${attr}="([^"]+)"[^>]*>`, "gi");
+    const re = new RegExp("<img[^>]+" + attr + '="([^"]+)"[^>]*>', "gi");
     let m: RegExpExecArray | null;
     while ((m = re.exec(html)) !== null) {
       const src = m[1];
@@ -361,7 +465,7 @@ export async function scrapeGenericList(
   fallbackDescription: string,
   fallbackCategory: string,
 ): Promise<ScrapedResult[]> {
-  const url = baseUrl.endsWith("/") ? `${baseUrl}${listingPath}` : `${baseUrl}/${listingPath}`.replace(/\/\//g, "/");
+  const url = baseUrl.endsWith("/") ? baseUrl + listingPath : baseUrl + "/" + listingPath.replace(/\/\//g, "/");
   const html = await fetchHtml(url);
   const results: ScrapedResult[] = [];
 

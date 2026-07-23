@@ -10,11 +10,15 @@
  * Fault-tolerant: if extraction fails, the original item is kept.
  * Listing/overview pages (detected by isListingPage) are skipped
  * to preserve original scrape data.
+ * SPA placeholder pages (Vue/React/Angular) fall back to extracting
+ * server-rendered hidden text, OG meta tags, and images.
  */
 import type { ScrapedResult } from "./types.js";
 import {
   fetchHtml,
   extractMainContent,
+  extractSpaFallback,
+  isSpaPlaceholderPage,
   sanitizeHtml,
   htmlToPlainText,
   extractImages,
@@ -50,9 +54,33 @@ export async function extractDetailPage(item: ScrapedResult): Promise<Partial<Sc
       const mainContent = extractMainContent(html);
 
       // If extractMainContent returns empty string, the page was detected
-      // as a listing/overview page (e.g. "Programme A bis Z" grid).
-      // Skip enrichment to preserve the original scrape data.
-      if (!mainContent) continue;
+      // as a listing/overview page (e.g. "Programme A bis Z" grid) or an
+      // unrendered SPA shell (Vue/React/Angular).
+      // For SPA pages, try the fallback extractor to harvest server-rendered
+      // hidden text, OG meta tags, and images.
+      if (!mainContent) {
+        if (isSpaPlaceholderPage(html)) {
+          const spaFallback = extractSpaFallback(html);
+          const hasContent = spaFallback.content.length > 50 || spaFallback.images.length > 0;
+          if (hasContent) {
+            const extra: Partial<ScrapedResult> = {};
+            if (spaFallback.content) {
+              extra.content = spaFallback.content;
+            }
+            if (spaFallback.plainText) {
+              extra.plainText = spaFallback.plainText;
+              extra.description = makeDescriptionFromText(spaFallback.plainText, 220);
+            }
+            if (spaFallback.images.length > 0) {
+              extra.images = spaFallback.images;
+              extra.coverImage = spaFallback.coverImage || spaFallback.images[0];
+            }
+            return extra;
+          }
+        }
+        // For listing pages or SPA with no fallback content, skip enrichment
+        continue;
+      }
 
       const sanitized = sanitizeHtml(mainContent);
       const plainText = htmlToPlainText(sanitized);
