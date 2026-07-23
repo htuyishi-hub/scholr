@@ -234,7 +234,7 @@ export function sanitizeHtml(input: string): string {
   html = html.replace(/<script[\s\S]*?<\/script>/gi, " ");
   html = html.replace(/<style[\s\S]*?<\/style>/gi, " ");
   html = html.replace(/\s+on[a-zA-Z]+\s*=\s*"[\s\S]*?"/gi, "");
-  const allowed = ["p","br","strong","b","em","i","u","ul","ol","li","blockquote","h1","h2","h3","h4","h5","h6","code","pre","table","thead","tbody","tr","td","th","a","span","div"];
+  const allowed = ["img", "p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "code", "pre", "table", "thead", "tbody", "tr", "td", "th", "a", "span", "div"];
   html = html.replace(/<\/?([a-zA-Z0-9:-]+)(\s[^>]*)?>/g, (match, tag) => {
     const t = String(tag).toLowerCase();
     if (!allowed.includes(t)) return " ";
@@ -263,14 +263,49 @@ export function htmlToPlainText(html: string): string {
     .trim();
 }
 
+/**
+ * Extract image URLs from HTML.
+ * Handles standard <img src>, lazy-loaded data-src/data-lazy-src/data-original,
+ * <noscript> fallback images, and CSS background-image URLs.
+ */
 export function extractImages(html: string): string[] {
-  const re = /<img[^>]+src="([^"]+)"[^>]*>/gi;
   const out: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    const src = m[1];
-    if (src) out.push(src);
+
+  // 1. Standard <img src="..."> tags
+  const re1 = /<img[^>]+src="([^"]+)"[^>]*>/gi;
+  let m1: RegExpExecArray | null;
+  while ((m1 = re1.exec(html)) !== null) {
+    const src = m1[1];
+    if (src && !src.startsWith("data:")) out.push(src);
   }
+
+  // 2. Lazy-loaded images: <img data-src="..."> or data-lazy-src, data-original
+  const lazyAttrs = ["data-src", "data-lazy-src", "data-original", "data-lazy", "data-srcset"];
+  for (const attr of lazyAttrs) {
+    const re = new RegExp(`<img[^>]+${attr}="([^"]+)"[^>]*>`, "gi");
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(html)) !== null) {
+      const src = m[1];
+      if (src && !src.startsWith("data:")) out.push(src);
+    }
+  }
+
+  // 3. Images in <noscript> fallback (common with lazy loading)
+  const noscriptRe = /<noscript[\s\S]*?<img[^>]+src="([^"]+)"[^>]*>[\s\S]*?<\/noscript>/gi;
+  let nm: RegExpExecArray | null;
+  while ((nm = noscriptRe.exec(html)) !== null) {
+    const src = nm[1];
+    if (src && !src.startsWith("data:")) out.push(src);
+  }
+
+  // 4. CSS background-image URLs (inline style)
+  const bgRe = /background-image:\s*url\(['"]?([^'")\s]+)['"]?\)/gi;
+  let bm: RegExpExecArray | null;
+  while ((bm = bgRe.exec(html)) !== null) {
+    const src = bm[1];
+    if (src && !src.startsWith("data:")) out.push(src);
+  }
+
   return Array.from(new Set(out));
 }
 
