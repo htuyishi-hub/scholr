@@ -12,6 +12,8 @@ interface JobPlatformConfig {
   maxLinks: number;
   description: string;
   category: string;
+  /** Set to false for sites with aggressive bot-blocking that return garbage HTML */
+  enabled?: boolean;
 }
 
 const platforms: JobPlatformConfig[] = [
@@ -25,8 +27,9 @@ const platforms: JobPlatformConfig[] = [
   { name: "BrighterMonday", baseUrl: "https://www.brightermonday.com", listingPath: "/", keywordPattern: /job|career|opportunity|vacancy/i, maxLinks: 12, description: "East African job platform.", category: "Jobs" },
   { name: "HigherEdJobs", baseUrl: "https://www.higheredjobs.com", listingPath: "/", keywordPattern: /job|faculty|position|career/i, maxLinks: 12, description: "Academic job listings.", category: "Jobs" },
   { name: "Times Higher Education Jobs", baseUrl: "https://www.timeshighereducation.com", listingPath: "/unijobs", keywordPattern: /job|position|faculty|career/i, maxLinks: 10, description: "University job listings.", category: "Jobs" },
-  { name: "LinkedIn Jobs", baseUrl: "https://www.linkedin.com", listingPath: "/jobs", keywordPattern: /job|opportunity|career|position/i, maxLinks: 10, description: "Global professional network job listings.", category: "Jobs" },
-  { name: "Indeed", baseUrl: "https://www.indeed.com", listingPath: "/", keywordPattern: /job|career|opportunity|position/i, maxLinks: 10, description: "Global job search platform.", category: "Jobs" },
+  // Disabled: aggressive bot-protection returns CAPTCHAs or empty pages, not real job links
+  { name: "LinkedIn Jobs", baseUrl: "https://www.linkedin.com", listingPath: "/jobs", keywordPattern: /job|opportunity|career|position/i, maxLinks: 10, description: "Global professional network job listings.", category: "Jobs", enabled: false },
+  { name: "Indeed", baseUrl: "https://www.indeed.com", listingPath: "/", keywordPattern: /job|career|opportunity|position/i, maxLinks: 10, description: "Global job search platform.", category: "Jobs", enabled: false },
 ];
 
 async function scrapePlatform(cfg: JobPlatformConfig): Promise<ScrapedResult[]> {
@@ -51,26 +54,14 @@ async function scrapePlatform(cfg: JobPlatformConfig): Promise<ScrapedResult[]> 
     }
   }
 
-  if (!results.length) {
-    results.push({
-      source: cfg.name,
-      sourceUrl: url,
-      title: `${cfg.name} — Job & Career Opportunities`,
-      description: cfg.description,
-      category: cfg.category,
-      applyLink: url,
-      itemType: "job",
-      rawData: { static: true },
-    });
-  }
-
+  // No static fallback — return empty rather than a phantom homepage link.
   return results;
 }
 
 export const jobScrapers: ScraperConfig[] = platforms.map((cfg) => ({
   name: cfg.name,
   category: "jobs" as const,
-  enabled: true,
+  enabled: cfg.enabled !== false,
   priority: 2,
   fn: () => scrapePlatform(cfg),
 }));

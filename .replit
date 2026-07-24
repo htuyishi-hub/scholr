@@ -11,6 +11,131 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "new f"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "here"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "new hold"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "git"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "name"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "email"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "check"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "new c"
+
+[[workflows.workflow]]
+name = "new f"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "ps aux | grep git"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "here"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git status"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "new hold"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git add ."
+
+[[workflows.workflow]]
+name = "git"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git config --global user.name"
+
+[[workflows.workflow]]
+name = "name"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git config --global user.name \"htuyishi-hub\""
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "email"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git config --global user.email \"htuyishi@gmail.com\""
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "check"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git config --global --list"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "new c"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git commit -m \"update scraper files\""
+
+[workflows.workflow.metadata]
+isValidation = true
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true

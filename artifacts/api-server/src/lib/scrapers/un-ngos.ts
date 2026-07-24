@@ -75,19 +75,7 @@ async function scrapeOrganization(cfg: UNConfig): Promise<ScrapedResult[]> {
     }
   }
 
-  if (!results.length) {
-    results.push({
-      source: cfg.name,
-      sourceUrl: url,
-      title: `${cfg.name} — Career Opportunities`,
-      description: cfg.description,
-      category: cfg.category,
-      applyLink: url,
-      itemType: "job",
-      rawData: { static: true },
-    });
-  }
-
+  // No static fallback — return empty rather than a phantom homepage link.
   return results;
 }
 

@@ -107,15 +107,43 @@ export function extractText(html: string, tag: string, clsPattern?: string): str
   return results;
 }
 
+// Noise words that appear in nav/footer links but never as real opportunity titles.
+const NAV_NOISE_RE =
+  /^(home|about|contact|login|log in|sign in|sign up|register|privacy|terms|cookies?|copyright|menu|search|language|skip to|back to|read more|learn more|click here|more info|see all|view all|subscribe|newsletter|follow us|share|tweet|facebook|linkedin|instagram|youtube|→|«|»|›|‹|\.\.\.)$/i;
+
+/**
+ * Extract meaningful links from a page.
+ *
+ * Improvements over the original:
+ * 1. Strip <nav>, <header>, <footer>, <aside> before scanning — avoids picking up
+ *    site navigation links (the main cause of garbage results like Google's nav bar).
+ * 2. Skip pseudo-hrefs (#, javascript:, mailto:).
+ * 3. Raise minimum title length to 12 characters.
+ * 4. Filter common navigation noise words.
+ */
 export function extractLinks(html: string, pattern?: RegExp): { text: string; href: string }[] {
+  // Remove structural chrome — nav bars, headers, footers, sidebars.
+  // Using non-greedy match; works well for non-deeply-nested elements.
+  const cleaned = html
+    .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+    .replace(/<header[\s\S]*?<\/header>/gi, "")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+    .replace(/<aside[\s\S]*?<\/aside>/gi, "");
+
   const re = /<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
   const results: { text: string; href: string }[] = [];
   let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
+  while ((m = re.exec(cleaned)) !== null) {
     const href = m[1];
+    // Skip pseudo-links and anchors
+    if (!href || href.startsWith("#") || href.startsWith("javascript:") || href.startsWith("mailto:")) continue;
     const text = m[2].replace(/<[^>]+>/g, "").trim();
+    // Require a meaningful title — navigation labels tend to be very short
+    if (text.length < 12) continue;
+    // Skip obvious nav noise words
+    if (NAV_NOISE_RE.test(text)) continue;
     if (pattern && !pattern.test(href + text)) continue;
-    if (text.length > 3) results.push({ text, href });
+    results.push({ text, href });
   }
   return results;
 }
@@ -488,19 +516,6 @@ export async function scrapeGenericList(
     }
   }
 
-  if (!results.length) {
-    results.push({
-      source,
-      sourceUrl: url,
-      title: fallbackTitle,
-      description: fallbackDescription,
-      country: "Rwanda",
-      category: fallbackCategory,
-      applyLink: url,
-      itemType,
-      rawData: { static: true },
-    });
-  }
-
+  // No static fallback — return empty rather than a phantom homepage link.
   return results;
 }

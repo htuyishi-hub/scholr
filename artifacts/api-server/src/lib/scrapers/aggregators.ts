@@ -54,19 +54,7 @@ async function scrapeAggregator(cfg: AggregatorConfig): Promise<ScrapedResult[]>
     }
   }
 
-  if (!results.length) {
-    results.push({
-      source: cfg.name,
-      sourceUrl: url,
-      title: `${cfg.name} — Opportunity Listing`,
-      description: cfg.description,
-      category: "Scholarships",
-      applyLink: url,
-      itemType: "scholarship",
-      rawData: { static: true },
-    });
-  }
-
+  // No static fallback — return empty rather than a phantom homepage link.
   return results;
 }
 
