@@ -248,7 +248,7 @@ router.get("/scraper/queue-counts", async (req, res) => {
     const approved = (counts["approved"] ?? 0) + (counts["published"] ?? 0);
 
     res.json({
-      all: rows.reduce((s, r) => s + Number(r.count), 0),
+      all: rows.reduce((s: number, r: { count: number | string }) => s + Number(r.count), 0),
       needs_review: needsReview,
       needs_images: counts["needs_images"] ?? 0,
       needs_metadata: counts["needs_metadata"] ?? 0,
@@ -303,7 +303,7 @@ router.post("/scraper/run", async (req, res) => {
 
     for (const item of enriched) {
       try {
-        const { score, issues } = computeQualityScore(item as Record<string, unknown>);
+        const { score, issues } = computeQualityScore(item as unknown as Record<string, unknown>);
         const auditEvents: AuditEvent[] = [
           makeAuditEvent("discovered", `Discovered by scraper: ${item.source}`, adminId),
           makeAuditEvent("enriched", `Enriched via ${item.extractionMethod ?? "html"}`, adminId),
@@ -783,7 +783,7 @@ router.get("/scraper/stats", (_req, res) => {
           approved: (counts["approved"] ?? 0) + (counts["published"] ?? 0),
           rejected: counts["rejected"] ?? 0,
           archived: counts["archived"] ?? 0,
-          total: rows.reduce((s, r) => s + Number(r.count), 0),
+          total: rows.reduce((s: number, r: { count: number | string }) => s + Number(r.count), 0),
         },
         publishedOpportunities: Number(published.count),
         totalSources: getSourceCount(),

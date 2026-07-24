@@ -17,6 +17,7 @@ export interface ScrapedResult {
   applyLink?: string;
   itemType: "scholarship" | "job";
   rawData?: Record<string, unknown>;
+  extractionMethod?: string;
 }
 
 export type ScraperCategory =
