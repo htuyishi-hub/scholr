@@ -32,6 +32,8 @@ import { AdminApplications } from "@/pages/admin/applications";
 import { AdminApplicationDetail } from "@/pages/admin/application-detail";
 import { ScraperPanel } from "@/pages/admin/scraper-panel";
 import { JobsPanel } from "@/pages/admin/jobs-panel";
+import { EditorialQueue } from "@/pages/admin/editorial-queue";
+import { EditorialItem } from "@/pages/admin/editorial-item";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +69,12 @@ function Router() {
       </Route>
       <Route path="/admin/scraper">
         <AuthGuard><AdminLayout><ScraperPanel /></AdminLayout></AuthGuard>
+      </Route>
+      <Route path="/admin/editorial">
+        <AuthGuard><AdminLayout><EditorialQueue /></AdminLayout></AuthGuard>
+      </Route>
+      <Route path="/admin/editorial/:id">
+        {params => <AuthGuard><AdminLayout><EditorialItem id={params.id} /></AdminLayout></AuthGuard>}
       </Route>
       <Route path="/admin/team">
         <AuthGuard><AdminLayout><Team /></AdminLayout></AuthGuard>

@@ -11,6 +11,7 @@ import {
   Inbox,
   Briefcase,
   Globe,
+  Layers,
 } from "lucide-react";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
 import { useState, useEffect } from "react";
@@ -38,6 +39,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   const navItems = [
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+    { name: "Editorial", href: "/admin/editorial", icon: Layers },
     { name: "Posts", href: "/admin/posts", icon: FileText },
     { name: "Applications", href: "/admin/applications", icon: Inbox },
     { name: "Jobs", href: "/admin/jobs", icon: Briefcase },
