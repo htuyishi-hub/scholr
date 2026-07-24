@@ -42,11 +42,7 @@ args = "check"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "new c"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "push"
+args = "bg"
 
 [[workflows.workflow]]
 name = "here"
@@ -115,26 +111,15 @@ args = "git config --global --list"
 isValidation = true
 
 [[workflows.workflow]]
-name = "new c"
+name = "bg"
 author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "git commit -m \"update scraper files\""
 
 [workflows.workflow.metadata]
 isValidation = true
 
-[[workflows.workflow]]
-name = "push"
-author = "agent"
-
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "git push origin main"
-
-[workflows.workflow.metadata]
-isValidation = true
+args = "git reflog --date=local -20"
 
 [agent]
 stack = "PNPM_WORKSPACE"
