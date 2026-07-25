@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, scrapedItemsTable, opportunitiesTable, jobsTable } from "@workspace/db";
-import { eq, desc, like, sql, inArray } from "drizzle-orm";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import { runAllScrapers, getSourceCount, getScrapersByCategory } from "../lib/scrapers/index.js";
 import { enrichResults } from "../lib/scrapers/detailExtractor.js";
 import pLimit from "p-limit";
@@ -58,38 +58,19 @@ function createPreview(plainText?: string | null, maxChars = 200): string {
   return cleaned.slice(0, maxChars).replace(/\s+\S*$/, "").trim() + "\u2026";
 }
 
-async function isDuplicate(
-  sourceUrl: string,
-  applyLink?: string | null,
-  title?: string | null,
-): Promise<boolean> {
-  const byUrl = await db
-    .select({ id: scrapedItemsTable.id })
-    .from(scrapedItemsTable)
-    .where(eq(scrapedItemsTable.sourceUrl, sourceUrl))
-    .limit(1);
-  if (byUrl.length) return true;
-
-  if (applyLink) {
-    const byApply = await db
-      .select({ id: opportunitiesTable.id })
-      .from(opportunitiesTable)
-      .where(eq(opportunitiesTable.applyLink, applyLink))
-      .limit(1);
-    if (byApply.length) return true;
+/** Batch-check which sourceUrls already exist in scraped_items. Returns a Set of known URLs. */
+async function getExistingUrls(urls: string[]): Promise<Set<string>> {
+  if (!urls.length) return new Set();
+  try {
+    const rows = await db
+      .select({ sourceUrl: scrapedItemsTable.sourceUrl })
+      .from(scrapedItemsTable)
+      .where(inArray(scrapedItemsTable.sourceUrl, urls));
+    return new Set(rows.map((r) => r.sourceUrl));
+  } catch {
+    // Table may not exist yet — treat as no duplicates
+    return new Set();
   }
-
-  if (title) {
-    const normalized = title.trim().toLowerCase().slice(0, 100);
-    const byTitle = await db
-      .select({ id: opportunitiesTable.id })
-      .from(opportunitiesTable)
-      .where(like(opportunitiesTable.title, `%${normalized}%`))
-      .limit(1);
-    if (byTitle.length) return true;
-  }
-
-  return false;
 }
 
 /** Compute a 0-100 quality score from item fields. */
@@ -274,9 +255,14 @@ router.post("/scraper/run", async (req, res) => {
 
   const startedAt = new Date().toISOString();
 
+  // Hard cap: respond within 120 s no matter what
+  const WALL_CLOCK_MS = 120_000;
+  const deadline = Date.now() + WALL_CLOCK_MS;
+
   try {
     const { results, summary } = await runAllScrapers();
 
+    // In-run deduplication by sourceUrl
     const seenUrls = new Set<string>();
     const uniqueResults: ScrapedResult[] = [];
     for (const item of results) {
@@ -287,16 +273,22 @@ router.post("/scraper/run", async (req, res) => {
     }
     const withinRunDeduped = results.length - uniqueResults.length;
 
-    const toEnrich: ScrapedResult[] = [];
-    let dbDuplicates = 0;
-    for (const item of uniqueResults) {
-      const dup = await isDuplicate(item.sourceUrl, item.applyLink, item.title);
-      if (dup) { dbDuplicates++; continue; }
-      toEnrich.push(item);
-    }
+    // Batch DB dedup — one query for all URLs instead of N sequential queries
+    const allUrls = uniqueResults.map((i) => i.sourceUrl).filter(Boolean);
+    const existingUrls = await getExistingUrls(allUrls);
+    const toEnrich = uniqueResults.filter((i) => !existingUrls.has(i.sourceUrl));
+    const dbDuplicates = uniqueResults.length - toEnrich.length;
 
-    const limit = pLimit(4);
-    const enriched = await enrichResults(toEnrich, limit);
+    // Cap enrichment: only fetch detail pages for the first 40 new items,
+    // and skip if we're already past the wall-clock deadline
+    const timeLeft = deadline - Date.now();
+    const enrichCap = Math.min(toEnrich.length, 40);
+    const toEnrichCapped = toEnrich.slice(0, enrichCap);
+
+    const limit = pLimit(6);
+    const enriched = timeLeft > 5_000
+      ? await enrichResults(toEnrichCapped, limit)
+      : toEnrichCapped; // skip enrichment if running out of time
 
     let added = 0;
     let insertFailed = 0;

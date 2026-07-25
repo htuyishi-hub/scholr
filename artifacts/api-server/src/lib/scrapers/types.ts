@@ -49,7 +49,7 @@ export interface ScraperResult {
   error?: string;
 }
 
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = 8000;
 const MAX_HTML_BYTES = 500_000; // 500KB — enough for article content, avoids OOM on huge pages
 
 export async function fetchHtml(url: string): Promise<string | null> {
