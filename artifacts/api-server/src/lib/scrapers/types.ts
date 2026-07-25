@@ -158,18 +158,160 @@ export function absoluteUrl(base: string, path: string): string {
   }
 }
 
+// ── Deadline extraction helpers ───────────────────────────────────────────────
+
+const MONTH_MAP: Record<string, number> = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+  jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8,
+  sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
+};
+
+function monthNum(s: string): number | undefined {
+  return MONTH_MAP[s.toLowerCase()];
+}
+
+function toIso(year: number, month: number, day?: number): string {
+  const y = String(year).padStart(4, "0");
+  const mo = String(month).padStart(2, "0");
+  return day === undefined
+    ? `${y}-${mo}`
+    : `${y}-${mo}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * Parse a date phrase (stripped of ordinal suffixes and extra commas) into ISO.
+ * Handles "Month DD YYYY" and "DD Month YYYY".
+ */
+function parseDatePhrase(raw: string): string | undefined {
+  const s = raw
+    .replace(/\b(?:st|nd|rd|th)\b/gi, "")
+    .replace(/[,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  // "October 31 2025"
+  let m = s.match(/^([A-Za-z]+)\s+(\d{1,2})\s+(\d{4})$/);
+  if (m) { const mo = monthNum(m[1]); if (mo) return toIso(+m[3], mo, +m[2]); }
+  // "31 October 2025"
+  m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  if (m) { const mo = monthNum(m[2]); if (mo) return toIso(+m[3], mo, +m[1]); }
+  return undefined;
+}
+
+// Shared regex fragments
+const MONTH_RE =
+  "(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)";
+const ORD_RE = "(?:st|nd|rd|th)?";
+const SEP_RE = "[\\s,]+";
+
+// Keyword anchor: deadline / due date / closing date / apply by / etc.
+const KW_RE =
+  "(?:application\\s+)?(?:deadline|due(?:\\s+date)?|clos(?:es?|ing)(?:\\s+date)?|appli(?:cation|cations)?\\s+(?:deadline|due|close[sd]?)|submit(?:ted)?(?:\\s+by)?|open(?:s|ed)?\\s+until|apply\\s+by|applications\\s+(?:by|until|open\\s+until)|until)";
+
+/**
+ * Extract a deadline date from plain text and return it normalised to ISO 8601
+ * (YYYY-MM-DD or YYYY-MM).  Returns "Rolling" for open/rolling deadlines.
+ * Returns undefined when no date is found.
+ *
+ * Priority order:
+ *  0. Rolling / no fixed deadline
+ *  1. ISO 8601  (2025-10-31)
+ *  2. Keyword-anchored written month  (Deadline: 31 October 2025)
+ *  3. Keyword-anchored numeric  (Due date: 31/10/2025)
+ *  4. "by / before / until DATE"
+ *  5. Bare written date  (31 October 2025 / October 31, 2025)
+ *  6. Numeric DD/MM/YYYY or MM/DD/YYYY
+ *  7. Month + year only  (October 2025)
+ */
 export function extractDeadline(text: string): string | undefined {
-  const patterns = [
-    /deadline[:\s]+([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i,
-    /(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/,
-    /(\d{4}-\d{2}-\d{2})/,
-    /by\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i,
-    /closes?\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i,
-  ];
-  for (const p of patterns) {
-    const m = text.match(p);
-    if (m) return m[1];
+  if (!text) return undefined;
+
+  // ── 0. Rolling / open ────────────────────────────────────────────────────
+  if (
+    /rolling\s+(?:deadline|basis|admission)/i.test(text) ||
+    /open\s+until\s+further\s+notice/i.test(text) ||
+    /no\s+(?:fixed\s+)?deadline/i.test(text)
+  ) {
+    return "Rolling";
   }
+
+  // ── 1. ISO 8601 ───────────────────────────────────────────────────────────
+  {
+    const m = text.match(/\b(\d{4})[-\/](\d{2})[-\/](\d{2})\b/);
+    if (m) return toIso(+m[1], +m[2], +m[3]);
+  }
+
+  // ── 2 & 3. Keyword-anchored ───────────────────────────────────────────────
+  const kwAnchoredPatterns: RegExp[] = [
+    // keyword: DD Month YYYY  or  Month DD, YYYY
+    new RegExp(`${KW_RE}[:\\s]+(\\d{1,2}${ORD_RE}${SEP_RE}${MONTH_RE}${SEP_RE}\\d{4})`, "i"),
+    new RegExp(`${KW_RE}[:\\s]+(${MONTH_RE}${SEP_RE}\\d{1,2}${ORD_RE}${SEP_RE}\\d{4})`, "i"),
+    // keyword: DD/MM/YYYY or DD-MM-YYYY
+    new RegExp(`${KW_RE}[:\\s]+(\\d{1,2}[\\/-]\\d{1,2}[\\/-]\\d{2,4})`, "i"),
+  ];
+  for (const re of kwAnchoredPatterns) {
+    const m = text.match(re);
+    if (m) {
+      // Try written-month parse first, fall back to numeric
+      const parsed = parseDatePhrase(m[1]);
+      if (parsed) return parsed;
+      // Numeric fallback: DD/MM/YYYY
+      const nm = m[1].match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+      if (nm) {
+        let year = +nm[3];
+        if (year < 100) year += 2000;
+        const day = +nm[1], mo = +nm[2];
+        if (day >= 1 && day <= 31 && mo >= 1 && mo <= 12) return toIso(year, mo, day);
+      }
+    }
+  }
+
+  // ── 4. "by / before / until DATE" ────────────────────────────────────────
+  const byPatterns: RegExp[] = [
+    new RegExp(`\\bby${SEP_RE}(\\d{1,2}${ORD_RE}${SEP_RE}${MONTH_RE}${SEP_RE}\\d{4})`, "i"),
+    new RegExp(`\\bby${SEP_RE}(${MONTH_RE}${SEP_RE}\\d{1,2}${ORD_RE}${SEP_RE}\\d{4})`, "i"),
+    new RegExp(`\\b(?:before|until)${SEP_RE}(\\d{1,2}${ORD_RE}${SEP_RE}${MONTH_RE}${SEP_RE}\\d{4})`, "i"),
+    new RegExp(`\\b(?:before|until)${SEP_RE}(${MONTH_RE}${SEP_RE}\\d{1,2}${ORD_RE}${SEP_RE}\\d{4})`, "i"),
+  ];
+  for (const re of byPatterns) {
+    const m = text.match(re);
+    if (m) { const parsed = parseDatePhrase(m[1]); if (parsed) return parsed; }
+  }
+
+  // ── 5. Bare written date ─────────────────────────────────────────────────
+  const barePatterns: RegExp[] = [
+    new RegExp(`\\b(\\d{1,2}${ORD_RE}${SEP_RE}${MONTH_RE}${SEP_RE}\\d{4})\\b`, "i"),
+    new RegExp(`\\b(${MONTH_RE}${SEP_RE}\\d{1,2}${ORD_RE}${SEP_RE}\\d{4})\\b`, "i"),
+  ];
+  for (const re of barePatterns) {
+    const m = text.match(re);
+    if (m) { const parsed = parseDatePhrase(m[1]); if (parsed) return parsed; }
+  }
+
+  // ── 6. Numeric DD/MM/YYYY ────────────────────────────────────────────────
+  {
+    const m = text.match(/\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\b/);
+    if (m) {
+      let year = +m[3];
+      if (year < 100) year += 2000;
+      const nowYear = new Date().getFullYear();
+      if (year >= nowYear) {
+        const day = +m[1], mo = +m[2];
+        if (day >= 1 && day <= 31 && mo >= 1 && mo <= 12) return toIso(year, mo, day);
+      }
+    }
+  }
+
+  // ── 7. Month + year only ─────────────────────────────────────────────────
+  {
+    const m = text.match(new RegExp(`\\b(${MONTH_RE})\\s+(\\d{4})\\b`, "i"));
+    if (m) {
+      const mo = monthNum(m[1]);
+      const year = +m[2];
+      if (mo && year >= new Date().getFullYear()) return toIso(year, mo);
+    }
+  }
+
   return undefined;
 }
 
