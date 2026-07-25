@@ -19,8 +19,6 @@ import {
   extractMainContent,
   extractSpaFallback,
   isSpaPlaceholderPage,
-  sanitizeHtml,
-  htmlToPlainText,
   extractImages,
   extractDeadline,
   makeDescriptionFromText,
@@ -51,62 +49,53 @@ export async function extractDetailPage(item: ScrapedResult): Promise<Partial<Sc
       const html = await fetchHtml(url);
       if (!html) continue;
 
-      const mainContent = extractMainContent(html);
+      // extractMainContent now returns clean plain text (not HTML).
+      // It strips page-builder scaffolding, decodes entities, and normalises
+      // whitespace before returning.  An empty return means listing/SPA page.
+      const plainText = extractMainContent(html);
 
-      // If extractMainContent returns empty string, the page was detected
-      // as a listing/overview page (e.g. "Programme A bis Z" grid) or an
-      // unrendered SPA shell (Vue/React/Angular).
-      // For SPA pages, try the fallback extractor to harvest server-rendered
-      // hidden text, OG meta tags, and images.
-      if (!mainContent) {
+      if (!plainText) {
+        // SPA fallback: harvest OG meta + server-rendered hidden text
         if (isSpaPlaceholderPage(html)) {
           const spaFallback = extractSpaFallback(html);
-          const hasContent = spaFallback.content.length > 50 || spaFallback.images.length > 0;
-          if (hasContent) {
-            const extra: Partial<ScrapedResult> = {};
-            if (spaFallback.content) {
-              extra.content = spaFallback.content;
-            }
-            if (spaFallback.plainText) {
-              extra.plainText = spaFallback.plainText;
-              extra.description = makeDescriptionFromText(spaFallback.plainText, 220);
-            }
+          if (spaFallback.plainText.length > 50) {
+            const extra: Partial<ScrapedResult> = {
+              content: spaFallback.plainText,
+              plainText: spaFallback.plainText,
+              description: makeDescriptionFromText(spaFallback.plainText, 220),
+            };
             if (spaFallback.images.length > 0) {
               extra.images = spaFallback.images;
               extra.coverImage = spaFallback.coverImage || spaFallback.images[0];
             }
+            const dl = extractDeadline(spaFallback.plainText);
+            if (dl) extra.deadline = dl;
             return extra;
           }
         }
-        // For listing pages or SPA with no fallback content, skip enrichment
         continue;
       }
 
-      const sanitized = sanitizeHtml(mainContent);
-      const plainText = htmlToPlainText(sanitized);
-      const images = extractImages(mainContent);
+      // Require a minimum amount of useful text
+      if (plainText.length < 80) continue;
 
-      // Skip if we got nothing useful (e.g. login form, empty page)
-      const hasContent = sanitized.length > 100 && plainText.length > 50;
-      if (!hasContent) continue;
+      const extra: Partial<ScrapedResult> = {
+        // Store clean plain text in both fields so the editorial UI always
+        // shows readable content, never raw HTML markup.
+        content: plainText,
+        plainText,
+        description: makeDescriptionFromText(plainText, 220),
+      };
 
-      const extra: Partial<ScrapedResult> = {};
-
-      if (sanitized) {
-        extra.content = sanitized;
-      }
-      if (plainText) {
-        extra.plainText = plainText;
-        extra.description = makeDescriptionFromText(plainText, 220);
-      }
+      // Extract cover image from the raw HTML (separate from text content)
+      const images = extractImages(html);
       if (images.length > 0) {
         extra.images = images;
         extra.coverImage = images[0];
       }
-      const dl = extractDeadline(plainText || html);
-      if (dl) {
-        extra.deadline = dl;
-      }
+
+      const dl = extractDeadline(plainText);
+      if (dl) extra.deadline = dl;
 
       return extra;
     } catch {

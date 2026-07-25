@@ -334,61 +334,111 @@ export function extractSpaFallback(html: string): {
 }
 
 /**
- * Extract the main content block from a full HTML page.
+ * Strip Elementor/WordPress page-builder scaffolding from HTML.
  *
- * Uses a scoring system: candidates with many <p> tags (article content)
- * are preferred over those with many <a>/<div> tags (navigation/listing grids).
- * If the page looks like a listing page (many teaser cards), returns empty string
- * so the caller can fall back to preserving the original scrape data.
- * If the page is an unrendered SPA shell (Vue/React/Angular), also returns empty string.
+ * Elementor wraps every piece of content in deeply nested divs with
+ * class="elementor-element elementor-element-XXXXXXXX ..." and inline
+ * data-settings="{...JSON...}" attributes. This strips those wrappers
+ * so downstream selectors can find real content blocks.
+ */
+function stripPageBuilderScaffolding(html: string): string {
+  // Remove Elementor data-settings / data-e-type / data-id attributes
+  // (they carry large JSON blobs that pollute plain-text extraction)
+  let out = html.replace(/\s+data-(?:settings|id|e-type|element_type|widget_type)="[^"]*"/gi, "");
+  // Strip MS Word / Office Online span annotation attributes
+  out = out.replace(/\s+data-ccp-(?:charstyle|props|parastyle)[^"]*"[^"]*"/gi, "");
+  out = out.replace(/\s+data-contrast="[^"]*"/gi, "");
+  return out;
+}
+
+/**
+ * Extract the main content block from a full HTML page as clean plain text.
+ *
+ * Strategy (in priority order):
+ * 1. Semantic HTML5 elements: <article>, <main>
+ * 2. Common CMS content wrappers by class/id keyword
+ * 3. Elementor / page-builder content widgets (.heading-description, .entry-content, etc.)
+ * 4. Paragraph-run fallback
+ *
+ * Returns plain text (not HTML). Returns empty string when the page is a
+ * listing/overview page or an unrendered SPA shell.
  */
 export function extractMainContent(html: string): string {
-  // If this is clearly a listing/overview page, return empty to signal
-  // "don't overwrite good scrape data"
   if (isListingPage(html)) return "";
-
-  // If this is an unrendered JS SPA shell (Vue/React/Angular with placeholders),
-  // return empty to preserve original scrape data
   if (isSpaPlaceholderPage(html)) return "";
 
-  const candidates: string[] = [];
-  const reSelectors: Array<RegExp> = [
+  // Pre-process: strip page-builder JSON noise before any further extraction
+  const cleaned = stripPageBuilderScaffolding(html);
+
+  // Helper: convert an HTML snippet to plain text
+  const toText = (snippet: string): string => htmlToPlainText(snippet);
+
+  // --- Priority 1: semantic elements ---
+  for (const re of [
     /<article[^>]*>([\s\S]*?)<\/article>/i,
     /<main[^>]*>([\s\S]*?)<\/main>/i,
-    /<div[^>]*(class|id)="[^"]*(content|article|body|main|post)[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /<section[^>]*(class|id)="[^"]*(content|article|body|main|post)[^"]*"[^>]*>([\s\S]*?)<\/section>/i,
-    /<div[^>]*(id|class)="content"[^>]*>([\s\S]*?)<\/div>/i,
-  ];
-  for (const re of reSelectors) {
-    const m = html.match(re);
+  ]) {
+    const m = cleaned.match(re);
     if (m) {
-      // Groups vary by regex; pick the first non-undefined capture group
-      const content = m[1] || m[2] || "";
-      if (content.length > 100) candidates.push(content);
+      const text = toText(m[1] || "");
+      if (text.length > 150) return text;
     }
   }
 
-  // Paragraph run fallback: up to 15 consecutive paragraphs (real article pages have many)
-  const pRun = html.match(/(<p[\s\S]*?>[\s\S]*?<\/p>\s*){3,15}/i);
-  if (pRun && pRun[0].length > 100) candidates.push(pRun[0]);
+  // --- Priority 2: CMS content wrappers by class/id ---
+  const cmsSelectors = [
+    /<div[^>]*(class|id)="[^"]*(?:entry-content|post-content|article-body|page-content|single-content)[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+    /<div[^>]*(class|id)="[^"]*(?:content|article|body|main|post)[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+    /<section[^>]*(class|id)="[^"]*(?:content|article|body|main|post)[^"]*"[^>]*>([\s\S]*?)<\/section>/i,
+  ];
+  for (const re of cmsSelectors) {
+    const m = cleaned.match(re);
+    if (m) {
+      const text = toText(m[1] || m[2] || "");
+      if (text.length > 150) return text;
+    }
+  }
 
-  // Score candidates: prefer those with high <p> density (real article content)
-  // over listing grids (many <a>/<div> tags, few <p> tags)
-  const scored = candidates.map((c) => {
-    const pCount = (c.match(/<p[\s\S]*?<\/p>/gi) || []).length;
-    const linkCount = (c.match(/<a[\s\S]*?<\/a>/gi) || []).length;
-    const divCount = (c.match(/<div[\s\S]*?<\/div>/gi) || []).length;
-    // Article content scores high; listing grids with zero <p> tags score low/negative
-    const score = pCount * 10 - linkCount * 2 - divCount;
-    return { content: c, score };
-  });
-  scored.sort((a, b) => b.score - a.score);
+  // --- Priority 3: Elementor / page-builder content widgets ---
+  // Elementor stores real copy in .heading-description, .elementor-text-editor,
+  // .elementor-widget-container p, etc.
+  const elementorSelectors = [
+    /<div[^>]*class="[^"]*(?:heading-description|elementor-text-editor|elementor-widget-text-editor)[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+    /<div[^>]*class="[^"]*wp-block-[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+  ];
+  const elementorTexts: string[] = [];
+  for (const re of elementorSelectors) {
+    const globalRe = new RegExp(re.source, "gi");
+    let m: RegExpExecArray | null;
+    while ((m = globalRe.exec(cleaned)) !== null) {
+      const text = toText(m[1] || "").trim();
+      if (text.length > 40) elementorTexts.push(text);
+    }
+  }
+  if (elementorTexts.length > 0) {
+    const combined = elementorTexts.join("\n\n");
+    if (combined.length > 150) return combined;
+  }
 
-  if (scored.length > 0 && scored[0].score > 5) return scored[0].content;
+  // --- Priority 4: paragraph-run fallback ---
+  // Collect all <p> text, score by word count, prefer dense prose over nav lists
+  const pRe = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+  const paragraphs: string[] = [];
+  let pm: RegExpExecArray | null;
+  while ((pm = pRe.exec(cleaned)) !== null) {
+    const text = toText(pm[1] || "").trim();
+    // Skip tiny paragraphs (navigation labels, captions) and link-only paragraphs
+    if (text.length < 40) continue;
+    paragraphs.push(text);
+  }
+  if (paragraphs.length >= 2) return paragraphs.join("\n\n");
 
-  // Ultra fallback: any paragraph run (even just 1-2 paragraphs)
-  const anyP = html.match(/(<p[\s\S]*?>[\s\S]*?<\/p>\s*){1,50}/i);
-  if (anyP) return anyP[0];
+  // Last resort: extract all visible text from the body
+  const bodyM = cleaned.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if (bodyM) {
+    const text = toText(bodyM[1]);
+    if (text.length > 150) return text;
+  }
 
   return "";
 }
@@ -414,16 +464,43 @@ export function sanitizeHtml(input: string): string {
   return html.replace(/\s+/g, " ");
 }
 
+/**
+ * Convert HTML to clean, readable plain text.
+ *
+ * Key improvements over the old version:
+ * - Inserts newlines at block-element boundaries so paragraphs don't run together.
+ * - Decodes all common HTML entities (including &quot;, &#160;, &#NNN;, &apos;).
+ * - Strips Elementor/Word-Online JSON blobs that leak into text via data-* attrs
+ *   (those attrs are inside tags and removed by the tag-strip, but this ensures
+ *   any leftover entity-encoded JSON is cleaned up too).
+ * - Collapses whitespace while preserving meaningful paragraph breaks.
+ */
 export function htmlToPlainText(html: string): string {
   return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
+    // Remove scripts and styles entirely
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    // Turn block-level closes into newlines so paragraphs don't merge into one line
+    .replace(/<\/(?:p|div|section|article|h[1-6]|li|blockquote|tr|td|th)[^>]*>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    // Strip all remaining tags (including all their attributes / data-* JSON blobs)
+    .replace(/<[^>]+>/g, "")
+    // Decode HTML entities
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
-    .replace(/"/g, '"')
-    .replace(/&#\d+;/g, "")
-    .replace(/\s+/g, " ")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#160;/gi, " ")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&[a-z]{2,8};/gi, " ")   // catch any remaining named entities
+    // Collapse horizontal whitespace but preserve newlines
+    .replace(/[ \t]+/g, " ")
+    // Trim each line
+    .replace(/^ +| +$/gm, "")
+    // Collapse 3+ blank lines into a single blank line
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
