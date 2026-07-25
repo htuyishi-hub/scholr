@@ -6,6 +6,7 @@ import { enrichResults } from "../lib/scrapers/detailExtractor.js";
 import pLimit from "p-limit";
 import { getUserIdFromToken } from "../lib/auth.js";
 import type { ScrapedResult } from "../lib/scrapers/types.js";
+import { htmlToPlainText } from "../lib/scrapers/types.js";
 import type { AuditEvent, QualityIssue } from "@workspace/db";
 
 const router = Router();
@@ -309,15 +310,27 @@ router.post("/scraper/run", async (req, res) => {
           makeAuditEvent("enriched", `Enriched via ${item.extractionMethod ?? "html"}`, adminId),
         ];
 
+        // Safety strip: run htmlToPlainText over content/plainText before
+        // storing so any HTML that slipped through extraction is removed.
+        const safeText = item.plainText ? htmlToPlainText(item.plainText) : null;
+        const safeContent = item.content
+          ? htmlToPlainText(item.content)
+          : safeText;
+        const safeDesc = safeText
+          ? createPreview(safeText)
+          : item.description
+          ? htmlToPlainText(item.description)
+          : null;
+
         await db.insert(scrapedItemsTable).values({
           source: item.source,
           sourceUrl: item.sourceUrl,
           title: item.title,
           itemType: item.itemType,
           status: "needs_review",
-          description: item.plainText ? createPreview(item.plainText) : (item.description ?? null),
-          content: item.content ?? null,
-          plainText: item.plainText ?? null,
+          description: safeDesc,
+          content: safeContent ?? null,
+          plainText: safeText ?? null,
           coverImage: item.coverImage ?? (item.images?.[0] ?? null),
           images: item.images ?? null,
           deadline: item.deadline ?? null,
@@ -407,6 +420,20 @@ router.get("/scraper/items", async (req, res) => {
     }
 
     res.json(items);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// DELETE /api/scraper/items — clear all scraped data (admin only)
+router.delete("/scraper/items", async (req, res) => {
+  const adminId = await getAdminId(req);
+  if (!adminId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  try {
+    await db.delete(scrapedItemsTable);
+    res.json({ ok: true, message: "All scraped items deleted" });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal error" });

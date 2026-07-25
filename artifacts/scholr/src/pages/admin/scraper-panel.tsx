@@ -6,10 +6,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   RefreshCw, CheckCircle2, X, ExternalLink, Globe, Loader2,
-  GraduationCap, Briefcase, Clock, ChevronDown, ChevronUp,
+  GraduationCap, Briefcase, Clock, ChevronDown, ChevronUp, Trash2,
 } from "lucide-react";
 
 interface ScrapedItem {
@@ -55,12 +66,21 @@ async function apiPost(path: string, body?: unknown) {
   if (!res.ok) throw new Error("Request failed");
   return res.json();
 }
+async function apiDelete(path: string) {
+  const res = await fetch(`${BASE}/api${path}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${TOKEN()}` },
+  });
+  if (!res.ok) throw new Error("Request failed");
+  return res.json();
+}
 
 export function ScraperPanel() {
   const { toast } = useToast();
   const [items, setItems] = useState<ScrapedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [lastRun, setLastRun] = useState<{ added: number; duplicates: number; summary: ScrapeRunResult[] } | null>(null);
   const [showSummary, setShowSummary] = useState(false);
@@ -80,6 +100,42 @@ export function ScraperPanel() {
   useEffect(() => { load(); }, [filter]);
 
   const runScraper = async () => {
+    setRunning(true);
+    try {
+      const result = await apiPost("/scraper/run");
+      setLastRun(result);
+      setShowSummary(true);
+      toast({ title: `Scrape complete — ${result.added} new items found` });
+      load();
+    } catch { toast({ title: "Scrape failed", variant: "destructive" }); }
+    setRunning(false);
+  };
+
+  const clearAll = async () => {
+    setClearing(true);
+    try {
+      await apiDelete("/scraper/items");
+      setItems([]);
+      setLastRun(null);
+      toast({ title: "All scraped data cleared" });
+    } catch { toast({ title: "Failed to clear data", variant: "destructive" }); }
+    setClearing(false);
+  };
+
+  const clearAndRerun = async () => {
+    setClearing(true);
+    try {
+      await apiDelete("/scraper/items");
+      setItems([]);
+      setLastRun(null);
+      toast({ title: "Cleared — starting fresh scrape…" });
+    } catch {
+      toast({ title: "Failed to clear data", variant: "destructive" });
+      setClearing(false);
+      return;
+    }
+    setClearing(false);
+    // Now run the scraper
     setRunning(true);
     try {
       const result = await apiPost("/scraper/run");
@@ -114,17 +170,71 @@ export function ScraperPanel() {
   };
 
   const pending = items.filter((i) => i.status === "pending").length;
+  const busy = running || clearing;
 
   return (
     <div>
       <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
         <div>
           <h1 className="font-serif text-2xl font-bold text-gray-900 mb-1">Content Scraper</h1>
-          <p className="text-muted-foreground text-sm">Fetch scholarships and jobs from Rwandan university and job sites. Review items before publishing.</p>
+          <p className="text-muted-foreground text-sm">Fetch scholarships and jobs from sources. Review items before publishing.</p>
         </div>
-        <Button onClick={runScraper} disabled={running} className="gap-2">
-          {running ? <><Loader2 size={14} className="animate-spin" /> Scraping...</> : <><RefreshCw size={14} /> Run Scraper</>}
-        </Button>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Clear All */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" disabled={busy} className="gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300">
+                {clearing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Clear All
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear all scraped data?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete every item in the scraper queue — pending, approved, and rejected. Published opportunities are not affected. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={clearAll} className="bg-red-600 hover:bg-red-700">
+                  Yes, delete all
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Clear & Rerun */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" disabled={busy} className="gap-2">
+                {busy ? <Loader2 size={14} className="animate-spin" /> : <><Trash2 size={14} /><RefreshCw size={14} /></>}
+                {clearing ? "Clearing…" : running ? "Scraping…" : "Clear & Rerun"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear all data and run a fresh scrape?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  All items in the queue will be deleted, then the scraper will run immediately to fetch fresh content. Published opportunities are not affected.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={clearAndRerun}>
+                  Clear & Rerun
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Run scraper */}
+          <Button onClick={runScraper} disabled={busy} className="gap-2">
+            {running ? <><Loader2 size={14} className="animate-spin" /> Scraping…</> : <><RefreshCw size={14} /> Run Scraper</>}
+          </Button>
+        </div>
       </div>
 
       {/* Last run summary */}
