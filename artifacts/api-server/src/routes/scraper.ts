@@ -66,7 +66,7 @@ async function getExistingUrls(urls: string[]): Promise<Set<string>> {
       .select({ sourceUrl: scrapedItemsTable.sourceUrl })
       .from(scrapedItemsTable)
       .where(inArray(scrapedItemsTable.sourceUrl, urls));
-    return new Set(rows.map((r) => r.sourceUrl));
+    return new Set(rows.map((r: { sourceUrl: string }) => r.sourceUrl));
   } catch {
     // Table may not exist yet — treat as no duplicates
     return new Set();
@@ -432,6 +432,20 @@ router.delete("/scraper/items", async (req, res) => {
   }
 });
 
+// DELETE /api/scraper/items/:id — delete a single scraped item
+router.delete("/scraper/items/:id", async (req, res) => {
+  const adminId = await getAdminId(req);
+  if (!adminId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  try {
+    await db.delete(scrapedItemsTable).where(eq(scrapedItemsTable.id, req.params.id));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // GET /api/scraper/items/:id
 router.get("/scraper/items/:id", async (req, res) => {
   const adminId = await getAdminId(req);
@@ -739,12 +753,19 @@ router.post("/scraper/items/bulk", async (req, res) => {
   try {
     const { ids, action, reason } = req.body as {
       ids: string[];
-      action: "approve" | "reject" | "archive" | "needs_review" | "needs_images" | "needs_metadata";
+      action: "approve" | "reject" | "archive" | "delete" | "needs_review" | "needs_images" | "needs_metadata";
       reason?: string;
     };
 
     if (!Array.isArray(ids) || ids.length === 0) {
       res.status(400).json({ error: "ids must be a non-empty array" }); return;
+    }
+
+    // Delete is a special case — no status update, just remove rows
+    if (action === "delete") {
+      await db.delete(scrapedItemsTable).where(inArray(scrapedItemsTable.id, ids));
+      res.json({ ok: true, deleted: ids.length });
+      return;
     }
 
     let newStatus: string;

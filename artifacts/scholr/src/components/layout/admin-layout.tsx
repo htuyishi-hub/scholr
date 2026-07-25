@@ -10,7 +10,6 @@ import {
   X,
   Inbox,
   Briefcase,
-  Globe,
   Layers,
 } from "lucide-react";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
@@ -43,7 +42,6 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     { name: "Posts", href: "/admin/posts", icon: FileText },
     { name: "Applications", href: "/admin/applications", icon: Inbox },
     { name: "Jobs", href: "/admin/jobs", icon: Briefcase },
-    { name: "Scraper", href: "/admin/scraper", icon: Globe },
     { name: "Team", href: "/admin/team", icon: Users },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];

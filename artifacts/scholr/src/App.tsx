@@ -30,7 +30,6 @@ import { Team } from "@/pages/admin/team";
 import { Settings } from "@/pages/admin/settings";
 import { AdminApplications } from "@/pages/admin/applications";
 import { AdminApplicationDetail } from "@/pages/admin/application-detail";
-import { ScraperPanel } from "@/pages/admin/scraper-panel";
 import { JobsPanel } from "@/pages/admin/jobs-panel";
 import { EditorialQueue } from "@/pages/admin/editorial-queue";
 import { EditorialItem } from "@/pages/admin/editorial-item";
@@ -68,7 +67,7 @@ function Router() {
         <AuthGuard><AdminLayout><JobsPanel /></AdminLayout></AuthGuard>
       </Route>
       <Route path="/admin/scraper">
-        <AuthGuard><AdminLayout><ScraperPanel /></AdminLayout></AuthGuard>
+        <Redirect to="/admin/editorial" />
       </Route>
       <Route path="/admin/editorial">
         <AuthGuard><AdminLayout><EditorialQueue /></AdminLayout></AuthGuard>

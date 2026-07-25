@@ -14,7 +14,7 @@ import {
   Image as ImageIcon, Globe, GraduationCap, Briefcase,
   AlertCircle, CheckCircle, ChevronRight, Loader2, History,
   Info, Star, FileText, Tag, Users, CalendarDays, Link2,
-  StickyNote, Shield, Eye, RotateCcw,
+  StickyNote, Shield, Eye, RotateCcw, Trash2,
 } from "lucide-react";
 import { computeQuality, scoreBg, scoreColor, scoreLabel, STATUS_META } from "@/lib/quality-score";
 
@@ -351,6 +351,17 @@ export function EditorialItem({ id }: { id: string }) {
     fetchItem();
   };
 
+  const deleteItem = async () => {
+    if (!item) return;
+    try {
+      await apiFetch(`/scraper/items/${item.id}`, { method: "DELETE" });
+      toast({ title: "Deleted" });
+      navigate("/admin/editorial");
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
+    }
+  };
+
   const selectCoverImage = (url: string) => {
     updateForm({ coverImage: url });
   };
@@ -457,6 +468,16 @@ export function EditorialItem({ id }: { id: string }) {
                 Archive
               </Button>
             )}
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={deleteItem}
+              className="h-8 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2"
+              title="Delete this item permanently"
+            >
+              <Trash2 size={13} />
+            </Button>
           </div>
         </div>
       </div>

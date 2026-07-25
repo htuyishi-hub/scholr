@@ -12,7 +12,7 @@ import {
   RefreshCw, Loader2, GraduationCap, Briefcase, ExternalLink,
   ChevronRight, ArrowUpDown, CheckSquare, X, AlertCircle,
   Image as ImageIcon, Clock, Globe, BarChart3, ListFilter,
-  Sparkles, ChevronDown,
+  Sparkles, Trash2,
 } from "lucide-react";
 import { computeQuality, scoreBg, STATUS_META } from "@/lib/quality-score";
 
@@ -104,6 +104,7 @@ function QueueCard({
   onNavigate,
   onQuickReject,
   onQuickPublish,
+  onDelete,
 }: {
   item: ScrapedItem;
   selected: boolean;
@@ -111,6 +112,7 @@ function QueueCard({
   onNavigate: () => void;
   onQuickReject: () => void;
   onQuickPublish: () => void;
+  onDelete: () => void;
 }) {
   const score = item.qualityScore ?? computeQuality(item as any).score;
   const statusMeta = STATUS_META[item.status] ?? STATUS_META["needs_review"];
@@ -236,6 +238,13 @@ function QueueCard({
             </>
           )}
           <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
+            title="Delete"
+          >
+            <Trash2 size={13} />
+          </button>
+          <button
             onClick={onNavigate}
             className="p-1.5 rounded-lg hover:bg-gray-100 text-muted-foreground hover:text-gray-700 transition-colors"
             title="Open in editorial workspace"
@@ -345,6 +354,17 @@ export function EditorialQueue() {
       setCounts((c) => c ? { ...c, rejected: c.rejected + 1, needs_review: Math.max(0, c.needs_review - 1) } : c);
     } catch {
       toast({ title: "Rejection failed", variant: "destructive" });
+    }
+  };
+
+  const deleteItem = async (id: string) => {
+    try {
+      await apiFetch(`/scraper/items/${id}`, { method: "DELETE" });
+      toast({ title: "Deleted" });
+      setItems((p) => p.filter((i) => i.id !== id));
+      fetchCounts();
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
     }
   };
 
@@ -497,6 +517,15 @@ export function EditorialQueue() {
             >
               {bulkLoading ? <Loader2 size={11} className="animate-spin" /> : "Reject all"}
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs border-red-300 text-red-700 hover:bg-red-50"
+              onClick={() => bulkAction("delete")}
+              disabled={bulkLoading}
+            >
+              {bulkLoading ? <Loader2 size={11} className="animate-spin" /> : <><Trash2 size={11} className="mr-1" />Delete all</>}
+            </Button>
             <button onClick={() => setSelected(new Set())} className="text-muted-foreground hover:text-gray-700 ml-1">
               <X size={14} />
             </button>
@@ -538,6 +567,7 @@ export function EditorialQueue() {
               onNavigate={() => navigate(`/admin/editorial/${item.id}`)}
               onQuickReject={() => quickReject(item.id)}
               onQuickPublish={() => quickPublish(item)}
+              onDelete={() => deleteItem(item.id)}
             />
           ))}
         </div>
