@@ -57,7 +57,7 @@ export async function extractDetailPage(item: ScrapedResult): Promise<Partial<Sc
       if (!plainText) {
         // SPA fallback: harvest OG meta + server-rendered hidden text
         if (isSpaPlaceholderPage(html)) {
-          const spaFallback = extractSpaFallback(html);
+          const spaFallback = extractSpaFallback(html, url);
           if (spaFallback.plainText.length > 50) {
             const extra: Partial<ScrapedResult> = {
               content: spaFallback.plainText,
@@ -88,7 +88,7 @@ export async function extractDetailPage(item: ScrapedResult): Promise<Partial<Sc
       };
 
       // Extract cover image from the raw HTML (separate from text content)
-      const images = extractImages(html);
+      const images = extractImages(html, url);
       if (images.length > 0) {
         extra.images = images;
         extra.coverImage = images[0];

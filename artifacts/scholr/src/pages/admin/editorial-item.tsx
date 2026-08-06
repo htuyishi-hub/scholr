@@ -14,9 +14,10 @@ import {
   Image as ImageIcon, Globe, GraduationCap, Briefcase,
   AlertCircle, CheckCircle, ChevronRight, Loader2, History,
   Info, Star, FileText, Tag, Users, CalendarDays, Link2,
-  StickyNote, Shield, Eye, RotateCcw, Trash2,
+  StickyNote, Shield, Eye, RotateCcw, Trash2, Plus, Wand2, ImagePlus,
 } from "lucide-react";
 import { computeQuality, scoreBg, scoreColor, scoreLabel, STATUS_META } from "@/lib/quality-score";
+import { htmlToReadableText, looksLikeHtml, parseImageUrls } from "@/lib/clean-text";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -238,6 +239,7 @@ export function EditorialItem({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("content");
+  const [newImageUrl, setNewImageUrl] = useState("");
   const [form, setForm] = useState<Partial<ScrapedItem>>({});
   const [isDirty, setIsDirty] = useState(false);
   const [statusChanging, setStatusChanging] = useState(false);
@@ -364,6 +366,56 @@ export function EditorialItem({ id }: { id: string }) {
 
   const selectCoverImage = (url: string) => {
     updateForm({ coverImage: url });
+  };
+
+  /** Add one or many public image links (nothing is uploaded, only linked). */
+  const addExternalImages = () => {
+    if (!item) return;
+    const { valid, invalid } = parseImageUrls(newImageUrl);
+    if (valid.length === 0) {
+      toast({ title: "Enter a valid image URL (https://…)", variant: "destructive" });
+      return;
+    }
+    const current = (form.images ?? item.images ?? []) as string[];
+    const merged = [...current];
+    let added = 0;
+    for (const url of valid) {
+      if (merged.includes(url)) continue;
+      merged.push(url);
+      added++;
+    }
+    const patch: Partial<ScrapedItem> = { images: merged };
+    // First image added to an item without a cover becomes the cover.
+    if (!(form.coverImage ?? item.coverImage) && merged.length > 0) {
+      patch.coverImage = merged[0];
+    }
+    updateForm(patch);
+    setNewImageUrl("");
+    toast({
+      title: added > 0 ? `${added} image link${added > 1 ? "s" : ""} added` : "Already in the gallery",
+      description: invalid.length > 0 ? `${invalid.length} entry skipped (not a valid URL)` : undefined,
+    });
+  };
+
+  const removeImage = (url: string) => {
+    if (!item) return;
+    const current = (form.images ?? item.images ?? []) as string[];
+    const next = current.filter((u) => u !== url);
+    const patch: Partial<ScrapedItem> = { images: next };
+    if ((form.coverImage ?? item.coverImage) === url) patch.coverImage = next[0] ?? "";
+    updateForm(patch);
+  };
+
+  /** Convert leftover HTML in a scraped record into clean editable text. */
+  const cleanContentHtml = () => {
+    const source = form.content ?? item?.content ?? "";
+    const cleaned = htmlToReadableText(source);
+    if (!cleaned) {
+      toast({ title: "Nothing to clean", variant: "destructive" });
+      return;
+    }
+    updateForm({ content: cleaned, plainText: cleaned });
+    toast({ title: "Content converted to clean text ✓" });
   };
 
   if (loading) {
@@ -529,7 +581,19 @@ export function EditorialItem({ id }: { id: string }) {
               <div>
                 <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5 block">
                   Full Content
-                  <span className="ml-2 text-[10px] text-muted-foreground font-normal normal-case">Accepts HTML</span>
+                  <span className="ml-2 text-[10px] text-muted-foreground font-normal normal-case">
+                    Clean editable text — HTML is stripped by the scraper
+                  </span>
+                  {looksLikeHtml(merged.content) && (
+                    <button
+                      type="button"
+                      onClick={cleanContentHtml}
+                      className="ml-2 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 normal-case hover:bg-amber-100"
+                      title="This record still contains raw HTML from an older scrape"
+                    >
+                      <Wand2 size={10} /> Convert HTML to text
+                    </button>
+                  )}
                 </label>
                 <Textarea
                   value={merged.content ?? ""}
@@ -625,6 +689,45 @@ export function EditorialItem({ id }: { id: string }) {
                 </div>
               </div>
 
+              {/* Add public image links */}
+              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-3">
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5 block">
+                  Add image from the web
+                </label>
+                <p className="text-[10px] text-muted-foreground mb-2">
+                  Paste any public image link (Wikimedia, Unsplash, the source site…). Multiple links can be
+                  pasted at once — separated by spaces, commas or new lines. Images are linked, never uploaded.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newImageUrl}
+                    onChange={(e) => setNewImageUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addExternalImages();
+                      }
+                    }}
+                    placeholder="https://upload.wikimedia.org/…/campus.jpg"
+                    className="text-xs border-gray-200 h-8"
+                  />
+                  <Button size="sm" onClick={addExternalImages} className="h-8 text-xs shrink-0">
+                    <Plus size={13} className="mr-1" /> Add
+                  </Button>
+                </div>
+                {newImageUrl.trim() !== "" && parseImageUrls(newImageUrl).valid.length === 1 && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <img
+                      src={parseImageUrls(newImageUrl).valid[0]}
+                      alt="Preview"
+                      className="h-14 w-20 rounded-md border border-gray-200 object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.visibility = "hidden"; }}
+                    />
+                    <span className="text-[10px] text-muted-foreground">Preview — press Add to keep it</span>
+                  </div>
+                )}
+              </div>
+
               {/* Gallery */}
               <div>
                 <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3 block">
@@ -655,13 +758,21 @@ export function EditorialItem({ id }: { id: string }) {
                         <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <span className="text-white text-[9px] font-medium">Set cover</span>
                         </div>
+                        <button
+                          type="button"
+                          title="Remove from gallery"
+                          onClick={(e) => { e.stopPropagation(); removeImage(url); }}
+                          className="absolute top-1 right-1 rounded-full bg-white/90 p-1 text-red-600 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
+                        >
+                          <X size={10} />
+                        </button>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div className="text-center py-10 text-muted-foreground bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                    <ImageIcon size={20} className="mx-auto mb-2 opacity-30" />
-                    <p className="text-xs">No images extracted from source</p>
+                    <ImagePlus size={20} className="mx-auto mb-2 opacity-30" />
+                    <p className="text-xs">No images yet — paste a public image link above</p>
                   </div>
                 )}
               </div>

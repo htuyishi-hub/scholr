@@ -1,6 +1,15 @@
 /**
  * Shared types and helpers for all scraper modules.
  */
+import {
+  extractArticleText,
+  extractImageUrls,
+  htmlToText,
+  ensurePlainText,
+  pickCoverImage,
+} from "./extract.js";
+
+export { extractArticleText, extractImageUrls, ensurePlainText, pickCoverImage, stripNonContent, decodeEntities } from "./extract.js";
 
 export interface ScrapedResult {
   source: string;
@@ -378,7 +387,7 @@ export function isListingPage(html: string): boolean {
  *
  * Returns fallback content: description, plainText, images, coverImage.
  */
-export function extractSpaFallback(html: string): {
+export function extractSpaFallback(html: string, baseUrl?: string): {
   content: string;
   plainText: string;
   images: string[];
@@ -409,7 +418,7 @@ export function extractSpaFallback(html: string): {
   if (hiddenTexts.length > 0) {
     const combined = hiddenTexts.join("\n\n");
     result.plainText = combined;
-    result.content = "<p>" + hiddenTexts.join("</p>\n<p>") + "</p>";
+    result.content = combined;
   }
 
   // 2. Harvest OG meta tags
@@ -421,10 +430,10 @@ export function extractSpaFallback(html: string): {
     const titleText = ogTitle[1].trim();
     if (result.plainText && !result.plainText.includes(titleText)) {
       result.plainText = titleText + "\n\n" + result.plainText;
-      result.content = "<h2>" + titleText + "</h2>\n" + result.content;
+      result.content = titleText + "\n\n" + result.content;
     } else if (!result.plainText) {
       result.plainText = titleText;
-      result.content = "<p>" + titleText + "</p>";
+      result.content = titleText;
     }
   }
 
@@ -432,21 +441,24 @@ export function extractSpaFallback(html: string): {
     const descText = ogDesc[1].trim();
     if (result.plainText && !result.plainText.includes(descText)) {
       result.plainText += "\n\n" + descText;
-      result.content += "\n<p>" + descText + "</p>";
+      result.content += "\n\n" + descText;
     } else if (!result.plainText) {
       result.plainText = descText;
-      result.content = "<p>" + descText + "</p>";
+      result.content = descText;
     }
   }
 
   if (ogImage && ogImage[1].trim().length > 10) {
     const imgSrc = ogImage[1].trim();
-    result.images.push(imgSrc);
-    result.coverImage = imgSrc;
+    const abs = baseUrl ? extractImageUrls(`<meta property="og:image" content="${imgSrc}">`, baseUrl)[0] : imgSrc;
+    if (abs) {
+      result.images.push(abs);
+      result.coverImage = abs;
+    }
   }
 
   // 3. Also harvest images from <noscript> fallback and lazy attrs
-  const spaImages = extractImages(html);
+  const spaImages = extractImages(html, baseUrl);
   for (const img of spaImages) {
     if (!result.images.includes(img)) {
       result.images.push(img);
@@ -461,14 +473,14 @@ export function extractSpaFallback(html: string): {
   let hm: RegExpExecArray | null;
   const headings: string[] = [];
   while ((hm = headingRe.exec(html)) !== null) {
-    const text = hm[0].replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
+    const text = htmlToText(hm[0]);
     if (text.length > 3) headings.push(text);
   }
   if (headings.length > 0) {
     const headingText = headings.slice(0, 3).join("\n");
     if (!result.plainText.includes(headingText.slice(0, 30))) {
       result.plainText = headingText + "\n\n" + result.plainText;
-      result.content = "<h2>" + headings.slice(0, 3).join("</h2>\n<h2>") + "</h2>\n" + result.content;
+      result.content = headingText + "\n\n" + result.content;
     }
   }
 
@@ -508,81 +520,7 @@ function stripPageBuilderScaffolding(html: string): string {
 export function extractMainContent(html: string): string {
   if (isListingPage(html)) return "";
   if (isSpaPlaceholderPage(html)) return "";
-
-  // Pre-process: strip page-builder JSON noise before any further extraction
-  const cleaned = stripPageBuilderScaffolding(html);
-
-  // Helper: convert an HTML snippet to plain text
-  const toText = (snippet: string): string => htmlToPlainText(snippet);
-
-  // --- Priority 1: semantic elements ---
-  for (const re of [
-    /<article[^>]*>([\s\S]*?)<\/article>/i,
-    /<main[^>]*>([\s\S]*?)<\/main>/i,
-  ]) {
-    const m = cleaned.match(re);
-    if (m) {
-      const text = toText(m[1] || "");
-      if (text.length > 150) return text;
-    }
-  }
-
-  // --- Priority 2: CMS content wrappers by class/id ---
-  const cmsSelectors = [
-    /<div[^>]*(class|id)="[^"]*(?:entry-content|post-content|article-body|page-content|single-content)[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /<div[^>]*(class|id)="[^"]*(?:content|article|body|main|post)[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /<section[^>]*(class|id)="[^"]*(?:content|article|body|main|post)[^"]*"[^>]*>([\s\S]*?)<\/section>/i,
-  ];
-  for (const re of cmsSelectors) {
-    const m = cleaned.match(re);
-    if (m) {
-      const text = toText(m[1] || m[2] || "");
-      if (text.length > 150) return text;
-    }
-  }
-
-  // --- Priority 3: Elementor / page-builder content widgets ---
-  // Elementor stores real copy in .heading-description, .elementor-text-editor,
-  // .elementor-widget-container p, etc.
-  const elementorSelectors = [
-    /<div[^>]*class="[^"]*(?:heading-description|elementor-text-editor|elementor-widget-text-editor)[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /<div[^>]*class="[^"]*wp-block-[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-  ];
-  const elementorTexts: string[] = [];
-  for (const re of elementorSelectors) {
-    const globalRe = new RegExp(re.source, "gi");
-    let m: RegExpExecArray | null;
-    while ((m = globalRe.exec(cleaned)) !== null) {
-      const text = toText(m[1] || "").trim();
-      if (text.length > 40) elementorTexts.push(text);
-    }
-  }
-  if (elementorTexts.length > 0) {
-    const combined = elementorTexts.join("\n\n");
-    if (combined.length > 150) return combined;
-  }
-
-  // --- Priority 4: paragraph-run fallback ---
-  // Collect all <p> text, score by word count, prefer dense prose over nav lists
-  const pRe = /<p[^>]*>([\s\S]*?)<\/p>/gi;
-  const paragraphs: string[] = [];
-  let pm: RegExpExecArray | null;
-  while ((pm = pRe.exec(cleaned)) !== null) {
-    const text = toText(pm[1] || "").trim();
-    // Skip tiny paragraphs (navigation labels, captions) and link-only paragraphs
-    if (text.length < 40) continue;
-    paragraphs.push(text);
-  }
-  if (paragraphs.length >= 2) return paragraphs.join("\n\n");
-
-  // Last resort: extract all visible text from the body
-  const bodyM = cleaned.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  if (bodyM) {
-    const text = toText(bodyM[1]);
-    if (text.length > 150) return text;
-  }
-
-  return "";
+  return extractArticleText(html);
 }
 
 export function sanitizeHtml(input: string): string {
@@ -618,32 +556,7 @@ export function sanitizeHtml(input: string): string {
  * - Collapses whitespace while preserving meaningful paragraph breaks.
  */
 export function htmlToPlainText(html: string): string {
-  return html
-    // Remove scripts and styles entirely
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    // Turn block-level closes into newlines so paragraphs don't merge into one line
-    .replace(/<\/(?:p|div|section|article|h[1-6]|li|blockquote|tr|td|th)[^>]*>/gi, "\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    // Strip all remaining tags (including all their attributes / data-* JSON blobs)
-    .replace(/<[^>]+>/g, "")
-    // Decode HTML entities
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&#160;/gi, " ")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-    .replace(/&[a-z]{2,8};/gi, " ")   // catch any remaining named entities
-    // Collapse horizontal whitespace but preserve newlines
-    .replace(/[ \t]+/g, " ")
-    // Trim each line
-    .replace(/^ +| +$/gm, "")
-    // Collapse 3+ blank lines into a single blank line
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return ensurePlainText(html);
 }
 
 /**
@@ -651,45 +564,8 @@ export function htmlToPlainText(html: string): string {
  * Handles standard <img src>, lazy-loaded data-src/data-lazy-src/data-original,
  * <noscript> fallback images, and CSS background-image URLs.
  */
-export function extractImages(html: string): string[] {
-  const out: string[] = [];
-
-  // 1. Standard <img src="..."> tags
-  const re1 = /<img[^>]+src="([^"]+)"[^>]*>/gi;
-  let m1: RegExpExecArray | null;
-  while ((m1 = re1.exec(html)) !== null) {
-    const src = m1[1];
-    if (src && !src.startsWith("data:")) out.push(src);
-  }
-
-  // 2. Lazy-loaded images: <img data-src="..."> or data-lazy-src, data-original
-  const lazyAttrs = ["data-src", "data-lazy-src", "data-original", "data-lazy", "data-srcset"];
-  for (const attr of lazyAttrs) {
-    const re = new RegExp("<img[^>]+" + attr + '="([^"]+)"[^>]*>', "gi");
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(html)) !== null) {
-      const src = m[1];
-      if (src && !src.startsWith("data:")) out.push(src);
-    }
-  }
-
-  // 3. Images in <noscript> fallback (common with lazy loading)
-  const noscriptRe = /<noscript[\s\S]*?<img[^>]+src="([^"]+)"[^>]*>[\s\S]*?<\/noscript>/gi;
-  let nm: RegExpExecArray | null;
-  while ((nm = noscriptRe.exec(html)) !== null) {
-    const src = nm[1];
-    if (src && !src.startsWith("data:")) out.push(src);
-  }
-
-  // 4. CSS background-image URLs (inline style)
-  const bgRe = /background-image:\s*url\(['"]?([^'")\s]+)['"]?\)/gi;
-  let bm: RegExpExecArray | null;
-  while ((bm = bgRe.exec(html)) !== null) {
-    const src = bm[1];
-    if (src && !src.startsWith("data:")) out.push(src);
-  }
-
-  return Array.from(new Set(out));
+export function extractImages(html: string, baseUrl?: string): string[] {
+  return extractImageUrls(html, baseUrl);
 }
 
 export function makeDescriptionFromText(plainText: string, maxChars = 220): string {
