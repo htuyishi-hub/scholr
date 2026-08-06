@@ -314,7 +314,7 @@ export function OpportunityDetail({ slug }: { slug: string }) {
         <div className="lg:col-span-2">
           {opp.coverImage && (
             <div className="relative h-72 rounded-2xl overflow-hidden mb-8">
-              <img src={opp.coverImage} alt={opp.title} className="w-full h-full object-cover" />
+              <img src={opp.coverImage} alt={opp.title} decoding="async" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
             </div>
           )}

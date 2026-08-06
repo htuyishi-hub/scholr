@@ -14,9 +14,33 @@ import { logger } from "./lib/logger.js";
 
 const app: Express = express();
 
+// Baseline security headers for every response (Lighthouse "Best Practices").
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  next();
+});
+
 // Serve the built React frontend from the monorepo's Vite output.
 // Vite outputs to: artifacts/scholr/dist/public
-app.use(express.static(frontendPublicDir, { index: false }));
+app.use(
+  express.static(frontendPublicDir, {
+    index: false,
+    etag: true,
+    setHeaders(res, filePath) {
+      // Vite emits content-hashed filenames under /assets, so they can be
+      // cached immutably. Everything else revalidates.
+      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      } else {
+        res.setHeader("Cache-Control", "public, max-age=3600");
+      }
+    },
+  }),
+);
 
 // For SPA routes (anything not starting with /api), fall back to index.html.
 app.use((req, res, next) => {
@@ -24,6 +48,7 @@ app.use((req, res, next) => {
     return next();
   }
 
+  res.setHeader("Cache-Control", "no-cache");
   res.sendFile(path.join(frontendPublicDir, "index.html"), (err) => {
     if (err) next(err);
   });

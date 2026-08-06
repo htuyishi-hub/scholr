@@ -1,40 +1,89 @@
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense, type ComponentType } from "react";
+import { Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 
 import { PublicLayout } from "@/components/layout/public-layout";
-import { AdminLayout } from "@/components/layout/admin-layout";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { StudentAuthProvider } from "@/hooks/use-student-auth";
 import { Auth0Provider } from "@/components/auth/auth0-provider";
 
+// The landing page is the most common entry point, so it stays in the main
+// bundle. Everything else is code-split so first paint ships far less JS.
 import { Home } from "@/pages/public/home";
-import { Browse } from "@/pages/public/browse";
-import { OpportunityDetail } from "@/pages/public/opportunity-detail";
-import { About } from "@/pages/public/about";
-import { StudentRegister } from "@/pages/public/student-register";
-import { StudentLogin } from "@/pages/public/student-login";
-import { StudentDashboard } from "@/pages/public/student-dashboard";
-import { StudentProfile } from "@/pages/public/student-profile";
-import { FindScholarship } from "@/pages/public/find-scholarship";
-import { Jobs } from "@/pages/public/jobs";
-import { Auth0Callback } from "@/pages/public/auth0-callback";
 
-import { Login } from "@/pages/admin/login";
-import { Dashboard } from "@/pages/admin/dashboard";
-import { Posts } from "@/pages/admin/posts";
-import { PostsForm } from "@/pages/admin/posts-form";
-import { Team } from "@/pages/admin/team";
-import { Settings } from "@/pages/admin/settings";
-import { AdminApplications } from "@/pages/admin/applications";
-import { AdminApplicationDetail } from "@/pages/admin/application-detail";
-import { JobsPanel } from "@/pages/admin/jobs-panel";
-import { EditorialQueue } from "@/pages/admin/editorial-queue";
-import { EditorialItem } from "@/pages/admin/editorial-item";
+/** Turn a named export into a lazy default-export component. */
+function lazyNamed<T extends string>(
+  loader: () => Promise<Record<string, unknown>>,
+  name: T,
+) {
+  return lazy(async () => ({
+    default: (await loader())[name] as ComponentType<any>,
+  }));
+}
 
-const queryClient = new QueryClient();
+const AdminLayout = lazyNamed(() => import("@/components/layout/admin-layout"), "AdminLayout");
+
+const Browse = lazyNamed(() => import("@/pages/public/browse"), "Browse");
+const OpportunityDetail = lazyNamed(
+  () => import("@/pages/public/opportunity-detail"),
+  "OpportunityDetail",
+);
+const About = lazyNamed(() => import("@/pages/public/about"), "About");
+const StudentRegister = lazyNamed(() => import("@/pages/public/student-register"), "StudentRegister");
+const StudentLogin = lazyNamed(() => import("@/pages/public/student-login"), "StudentLogin");
+const StudentDashboard = lazyNamed(
+  () => import("@/pages/public/student-dashboard"),
+  "StudentDashboard",
+);
+const StudentProfile = lazyNamed(() => import("@/pages/public/student-profile"), "StudentProfile");
+const FindScholarship = lazyNamed(() => import("@/pages/public/find-scholarship"), "FindScholarship");
+const Jobs = lazyNamed(() => import("@/pages/public/jobs"), "Jobs");
+const Auth0Callback = lazyNamed(() => import("@/pages/public/auth0-callback"), "Auth0Callback");
+
+const Login = lazyNamed(() => import("@/pages/admin/login"), "Login");
+const Dashboard = lazyNamed(() => import("@/pages/admin/dashboard"), "Dashboard");
+const Posts = lazyNamed(() => import("@/pages/admin/posts"), "Posts");
+const PostsForm = lazyNamed(() => import("@/pages/admin/posts-form"), "PostsForm");
+const Team = lazyNamed(() => import("@/pages/admin/team"), "Team");
+const Settings = lazyNamed(() => import("@/pages/admin/settings"), "Settings");
+const AdminApplications = lazyNamed(() => import("@/pages/admin/applications"), "AdminApplications");
+const AdminApplicationDetail = lazyNamed(
+  () => import("@/pages/admin/application-detail"),
+  "AdminApplicationDetail",
+);
+const JobsPanel = lazyNamed(() => import("@/pages/admin/jobs-panel"), "JobsPanel");
+const EditorialQueue = lazyNamed(() => import("@/pages/admin/editorial-queue"), "EditorialQueue");
+const EditorialItem = lazyNamed(() => import("@/pages/admin/editorial-item"), "EditorialItem");
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Avoid the refetch storms Lighthouse flagged: cached data stays fresh
+      // for a minute and failed (e.g. 401) requests are not retried.
+      staleTime: 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: false,
+    },
+  },
+});
+
+function RouteFallback() {
+  return (
+    <div
+      className="min-h-[50vh] flex items-center justify-center"
+      role="status"
+      aria-live="polite"
+    >
+      <Loader2 className="w-6 h-6 animate-spin text-primary" aria-hidden="true" />
+      <span className="sr-only">Loading page…</span>
+    </div>
+  );
+}
 
 function Router() {
   return (
@@ -133,7 +182,9 @@ function App() {
         <TooltipProvider>
           <StudentAuthProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <Router />
+              <Suspense fallback={<RouteFallback />}>
+                <Router />
+              </Suspense>
             </WouterRouter>
             <Toaster />
           </StudentAuthProvider>

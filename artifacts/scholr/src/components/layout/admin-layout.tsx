@@ -12,14 +12,15 @@ import {
   Briefcase,
   Layers,
 } from "lucide-react";
-import { useGetMe, useLogout } from "@workspace/api-client-react";
+import { useLogout } from "@workspace/api-client-react";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
 export function AdminLayout({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { data: user } = useGetMe();
+  const { data: user } = useCurrentUser();
   const logout = useLogout();
 
   // Force light mode for admin
@@ -102,7 +103,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3 mb-4 px-2">
             <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center font-medium text-sidebar-accent-foreground overflow-hidden">
               {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                <img src={user.avatarUrl} alt={user.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
               ) : (
                 user?.name?.charAt(0).toUpperCase() || "U"
               )}

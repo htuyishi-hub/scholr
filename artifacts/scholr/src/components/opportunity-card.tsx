@@ -129,7 +129,7 @@ export function OpportunityCard({ opp, large = false }: { opp: Opportunity; larg
         <Link href={`/opportunity/${opp.slug}`}>
           <div className="relative h-72 bg-card overflow-hidden">
             {opp.coverImage ? (
-              <img src={opp.coverImage} alt={opp.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              <img src={opp.coverImage} alt={opp.title} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-primary/20 to-card" />
             )}
@@ -187,7 +187,7 @@ export function OpportunityCard({ opp, large = false }: { opp: Opportunity; larg
       <Link href={`/opportunity/${opp.slug}`} className="block">
         <div className="relative aspect-video overflow-hidden bg-muted">
           {opp.coverImage ? (
-            <img src={opp.coverImage} alt={opp.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            <img src={opp.coverImage} alt={opp.title} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-primary/10 via-card to-card" />
           )}

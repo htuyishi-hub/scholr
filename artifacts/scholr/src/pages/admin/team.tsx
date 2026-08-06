@@ -25,7 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useListUsers, useCreateUser, useDeleteUser, useGetMe } from "@workspace/api-client-react";
+import { useListUsers, useCreateUser, useDeleteUser } from "@workspace/api-client-react";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useToast } from "@/hooks/use-toast";
 
 type Role = "admin" | "editor";
@@ -33,7 +34,7 @@ type Role = "admin" | "editor";
 export function Team() {
   const { toast } = useToast();
   const { data: users, isLoading, refetch } = useListUsers();
-  const { data: me } = useGetMe();
+  const { data: me } = useCurrentUser();
   const createUser = useCreateUser();
   const deleteUser = useDeleteUser();
 

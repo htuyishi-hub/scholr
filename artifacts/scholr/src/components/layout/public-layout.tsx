@@ -141,8 +141,14 @@ export function PublicLayout({ children }: { children: ReactNode }) {
             )}
           </nav>
 
-          <button className="md:hidden text-foreground p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          <button
+            type="button"
+            className="md:hidden text-foreground p-2 min-h-11 min-w-11 flex items-center justify-center"
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? <X size={24} aria-hidden="true" /> : <Menu size={24} aria-hidden="true" />}
           </button>
         </div>
 
@@ -194,6 +200,7 @@ export function PublicLayout({ children }: { children: ReactNode }) {
                     target="_blank"
                     rel="noopener noreferrer"
                     title={s.name}
+                    aria-label={s.name}
                     className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:scale-110 hover:shadow-lg"
                     style={{ backgroundColor: s.color + "20", color: s.color }}
                   >
