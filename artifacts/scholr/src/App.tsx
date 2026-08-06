@@ -67,6 +67,9 @@ const queryClient = new QueryClient({
       staleTime: 60 * 1000,
       gcTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
+      // Don't re-fire all queries the moment the browser reconnects after a
+      // network drop — this was the root cause of the /api/auth/me 401 storm.
+      refetchOnReconnect: false,
       retry: false,
     },
   },

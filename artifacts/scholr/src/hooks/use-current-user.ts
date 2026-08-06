@@ -23,6 +23,9 @@ export function useCurrentUser() {
       retry: false,
       staleTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
+      // Prevent the 401 storm that fires when the browser reconnects after a
+      // network drop (ERR_INTERNET_DISCONNECTED → reconnect → refetch loop).
+      refetchOnReconnect: false,
     } as any,
   });
 
