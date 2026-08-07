@@ -58,18 +58,28 @@ function createPreview(plainText?: string | null, maxChars = 200): string {
   return cleaned.slice(0, maxChars).replace(/\s+\S*$/, "").trim() + "\u2026";
 }
 
-/** Batch-check which sourceUrls already exist in scraped_items. Returns a Set of known URLs. */
-async function getExistingUrls(urls: string[]): Promise<Set<string>> {
-  if (!urls.length) return new Set();
+/**
+ * Batch-check which sourceUrls already exist in scraped_items.
+ * Queries in chunks (Postgres has a bind-parameter limit) and surfaces any
+ * query error instead of silently pretending there are no duplicates.
+ */
+async function getExistingUrls(
+  urls: string[],
+): Promise<{ known: Set<string>; error?: string }> {
+  const known = new Set<string>();
+  if (!urls.length) return { known };
+  const CHUNK = 400;
   try {
-    const rows = await db
-      .select({ sourceUrl: scrapedItemsTable.sourceUrl })
-      .from(scrapedItemsTable)
-      .where(inArray(scrapedItemsTable.sourceUrl, urls));
-    return new Set(rows.map((r: { sourceUrl: string }) => r.sourceUrl));
-  } catch {
-    // Table may not exist yet — treat as no duplicates
-    return new Set();
+    for (let i = 0; i < urls.length; i += CHUNK) {
+      const rows = await db
+        .select({ sourceUrl: scrapedItemsTable.sourceUrl })
+        .from(scrapedItemsTable)
+        .where(inArray(scrapedItemsTable.sourceUrl, urls.slice(i, i + CHUNK)));
+      for (const r of rows as { sourceUrl: string }[]) known.add(r.sourceUrl);
+    }
+    return { known };
+  } catch (err) {
+    return { known, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -262,20 +272,45 @@ router.post("/scraper/run", async (req, res) => {
   try {
     const { results, summary } = await runAllScrapers();
 
-    // In-run deduplication by sourceUrl
+    // ── 1. Validate ────────────────────────────────────────────────────────
+    // Items without a usable sourceUrl or title can never be inserted (and
+    // previously all collapsed onto one dedupe key, so they were miscounted as
+    // "duplicates"). Reject them explicitly and report why.
+    const invalidItems: { source: string; title: string; reason: string }[] = [];
+    const validResults: ScrapedResult[] = [];
+    for (const item of results) {
+      const url = typeof item.sourceUrl === "string" ? item.sourceUrl.trim() : "";
+      const title = typeof item.title === "string" ? item.title.trim() : "";
+      if (!/^https?:\/\//i.test(url)) {
+        invalidItems.push({
+          source: item.source ?? "unknown",
+          title: title || "(no title)",
+          reason: `missing or invalid sourceUrl: ${JSON.stringify(item.sourceUrl ?? null)}`,
+        });
+        continue;
+      }
+      if (!title) {
+        invalidItems.push({ source: item.source ?? "unknown", title: "(no title)", reason: "missing title" });
+        continue;
+      }
+      validResults.push({ ...item, sourceUrl: url, title });
+    }
+
+    // ── 2. In-run deduplication by sourceUrl ───────────────────────────────
     const seenUrls = new Set<string>();
     const uniqueResults: ScrapedResult[] = [];
-    for (const item of results) {
+    for (const item of validResults) {
       const key = item.sourceUrl;
       if (seenUrls.has(key)) continue;
       seenUrls.add(key);
       uniqueResults.push(item);
     }
-    const withinRunDeduped = results.length - uniqueResults.length;
+    const withinRunDeduped = validResults.length - uniqueResults.length;
 
-    // Batch DB dedup — one query for all URLs instead of N sequential queries
-    const allUrls = uniqueResults.map((i) => i.sourceUrl).filter(Boolean);
-    const existingUrls = await getExistingUrls(allUrls);
+    // ── 3. Batch DB dedup — chunked queries, errors surfaced ───────────────
+    const allUrls = uniqueResults.map((i) => i.sourceUrl);
+    const { known: existingUrls, error: dedupeError } = await getExistingUrls(allUrls);
+    if (dedupeError) req.log.error({ dedupeError }, "scraper: dedupe query failed");
     const toEnrich = uniqueResults.filter((i) => !existingUrls.has(i.sourceUrl));
     const dbDuplicates = uniqueResults.length - toEnrich.length;
 
@@ -292,6 +327,7 @@ router.post("/scraper/run", async (req, res) => {
 
     let added = 0;
     let insertFailed = 0;
+    const insertErrors: { title: string; sourceUrl: string; error: string }[] = [];
     const duplicates = withinRunDeduped + dbDuplicates;
 
     for (const item of enriched) {
@@ -337,8 +373,16 @@ router.post("/scraper/run", async (req, res) => {
           extractionMethod: item.extractionMethod ?? null,
         });
         added++;
-      } catch {
+      } catch (err) {
         insertFailed++;
+        const message = err instanceof Error ? err.message : String(err);
+        req.log.error(
+          { err, sourceUrl: item.sourceUrl, title: item.title },
+          "scraper: insert into scraped_items failed",
+        );
+        if (insertErrors.length < 10) {
+          insertErrors.push({ title: item.title ?? "(no title)", sourceUrl: item.sourceUrl, error: message });
+        }
       }
     }
 
@@ -350,6 +394,22 @@ router.post("/scraper/run", async (req, res) => {
       added,
       duplicates,
       failed: insertFailed + summary.errors.length,
+      // Full breakdown so a run that adds nothing explains itself
+      diagnostics: {
+        scraped: results.length,
+        invalid: invalidItems.length,
+        invalidSamples: invalidItems.slice(0, 10),
+        withinRunDuplicates: withinRunDeduped,
+        dbDuplicates,
+        dedupeError: dedupeError ?? null,
+        candidates: toEnrich.length,
+        enrichmentSkipped: !(timeLeft > 5_000),
+        enrichCapped: toEnrich.length > enrichCap,
+        attemptedInserts: enriched.length,
+        inserted: added,
+        insertFailed,
+        insertErrors,
+      },
       pending: added,
       approved: 0,
       rejected: 0,
