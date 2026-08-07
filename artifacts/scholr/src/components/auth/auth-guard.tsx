@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import { useCurrentUser, hasAdminToken } from "@/hooks/use-current-user";
+import { useCurrentUser, hasAdminToken, clearAdminToken } from "@/hooks/use-current-user";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { data: user, isLoading, error, enabled } = useCurrentUser();
@@ -13,10 +13,15 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       setLocation("/admin/login");
       return;
     }
-    if (!isLoading && (!user || error)) {
+    if (!enabled) return;
+    if (isLoading) return;
+    if (!user || error) {
+      // Drop the rejected token first, otherwise the login page bounces us
+      // straight back here and the /api/auth/me 401 storm starts again.
+      clearAdminToken();
       setLocation("/admin/login");
     }
-  }, [user, isLoading, error, setLocation]);
+  }, [user, isLoading, error, enabled, setLocation]);
 
   if (enabled && isLoading) {
     return (
