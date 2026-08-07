@@ -11,6 +11,63 @@ import type { AuditEvent, QualityIssue } from "@workspace/db";
 
 const router = Router();
 
+// ── Self-healing schema ──────────────────────────────────
+// The editorial workspace (migration v3) adds ~20 columns to scraped_items.
+// If that migration was never applied to the live database, every
+// `db.select()` over scraped_items fails ("column ... does not exist"), so the
+// editorial queue renders "0 items" while the scraper still reports rows as
+// duplicates (the dedupe query only touches source_url, which always exists).
+// We apply the additive, idempotent DDL once per process so the app cannot end
+// up in that split-brain state again.
+let schemaEnsured: Promise<void> | null = null;
+
+const EDITORIAL_SCHEMA_SQL = `
+ALTER TABLE scraped_items
+  ADD COLUMN IF NOT EXISTS quality_score     INTEGER       DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS quality_issues    JSONB,
+  ADD COLUMN IF NOT EXISTS extraction_trace  JSONB,
+  ADD COLUMN IF NOT EXISTS sections          JSONB,
+  ADD COLUMN IF NOT EXISTS organization_profile JSONB,
+  ADD COLUMN IF NOT EXISTS funding_details   JSONB,
+  ADD COLUMN IF NOT EXISTS tags              TEXT[],
+  ADD COLUMN IF NOT EXISTS opportunity_type  TEXT,
+  ADD COLUMN IF NOT EXISTS academic_level    TEXT[],
+  ADD COLUMN IF NOT EXISTS eligible_nationalities TEXT[],
+  ADD COLUMN IF NOT EXISTS language          TEXT,
+  ADD COLUMN IF NOT EXISTS duration          TEXT,
+  ADD COLUMN IF NOT EXISTS salary            TEXT,
+  ADD COLUMN IF NOT EXISTS assigned_to       TEXT,
+  ADD COLUMN IF NOT EXISTS internal_notes    TEXT,
+  ADD COLUMN IF NOT EXISTS rejection_reason  TEXT,
+  ADD COLUMN IF NOT EXISTS scheduled_at      TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS published_at      TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS archived_at       TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS audit_events      JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS verification_status JSONB,
+  ADD COLUMN IF NOT EXISTS updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW();
+`;
+
+async function ensureEditorialSchema(): Promise<void> {
+  if (!schemaEnsured) {
+    schemaEnsured = (async () => {
+      await db.execute(sql.raw(EDITORIAL_SCHEMA_SQL));
+      await db.execute(sql.raw(
+        "CREATE INDEX IF NOT EXISTS idx_scraped_items_status ON scraped_items(status)",
+      ));
+      await db.execute(sql.raw(
+        "CREATE INDEX IF NOT EXISTS idx_scraped_items_quality ON scraped_items(quality_score DESC)",
+      ));
+      await db.execute(sql.raw(
+        "CREATE INDEX IF NOT EXISTS idx_scraped_items_updated ON scraped_items(updated_at DESC)",
+      ));
+    })().catch((err) => {
+      schemaEnsured = null; // allow a retry on the next request
+      throw err;
+    });
+  }
+  return schemaEnsured;
+}
+
 // ── Helpers ──────────────────────────────────────────────
 
 async function getAdminId(req: import("express").Request): Promise<string | null> {
@@ -227,6 +284,7 @@ router.get("/scraper/queue-counts", async (req, res) => {
   if (!adminId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
   try {
+    await ensureEditorialSchema();
     const rows = await db
       .select({ status: scrapedItemsTable.status, count: sql<number>`count(*)` })
       .from(scrapedItemsTable)
@@ -268,6 +326,14 @@ router.post("/scraper/run", async (req, res) => {
   // Hard cap: respond within 120 s no matter what
   const WALL_CLOCK_MS = 120_000;
   const deadline = Date.now() + WALL_CLOCK_MS;
+
+  let schemaError: string | null = null;
+  try {
+    await ensureEditorialSchema();
+  } catch (err) {
+    schemaError = err instanceof Error ? err.message : String(err);
+    req.log.error({ err }, "scraper: ensureEditorialSchema failed");
+  }
 
   try {
     const { results, summary } = await runAllScrapers();
@@ -396,6 +462,7 @@ router.post("/scraper/run", async (req, res) => {
       failed: insertFailed + summary.errors.length,
       // Full breakdown so a run that adds nothing explains itself
       diagnostics: {
+        schemaError,
         scraped: results.length,
         invalid: invalidItems.length,
         invalidSamples: invalidItems.slice(0, 10),
@@ -442,6 +509,7 @@ router.get("/scraper/items", async (req, res) => {
   if (!adminId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
   try {
+    await ensureEditorialSchema();
     const { status } = req.query as { status?: string };
 
     let items;
@@ -474,7 +542,10 @@ router.get("/scraper/items", async (req, res) => {
     res.json(items);
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "Internal error" });
+    res.status(500).json({
+      error: "Internal error",
+      detail: err instanceof Error ? err.message : String(err),
+    });
   }
 });
 
@@ -892,6 +963,56 @@ router.get("/scraper/stats", (_req, res) => {
       res.status(500).json({ error: "Internal error", detail: err instanceof Error ? err.message : String(err) });
     }
   })();
+});
+
+// GET /api/scraper/diagnose — why is the queue empty?
+// Reports the real row count, the per-status breakdown, whether the editorial
+// columns exist, and the exact error if reading scraped_items fails.
+router.get("/scraper/diagnose", async (req, res) => {
+  const adminId = await getAdminId(req);
+  if (!adminId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const report: Record<string, unknown> = {};
+
+  try {
+    await ensureEditorialSchema();
+    report.schemaOk = true;
+  } catch (err) {
+    report.schemaOk = false;
+    report.schemaError = err instanceof Error ? err.message : String(err);
+  }
+
+  try {
+    const rows = await db.execute(
+      sql.raw("SELECT count(*)::int AS total FROM scraped_items"),
+    );
+    report.rawRowCount = (rows as any).rows?.[0]?.total ?? (rows as any)[0]?.total ?? null;
+  } catch (err) {
+    report.rawRowCountError = err instanceof Error ? err.message : String(err);
+  }
+
+  try {
+    const cols = await db.execute(
+      sql.raw(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'scraped_items' ORDER BY column_name",
+      ),
+    );
+    const list = ((cols as any).rows ?? cols) as { column_name: string }[];
+    report.columns = list.map((c) => c.column_name);
+  } catch (err) {
+    report.columnsError = err instanceof Error ? err.message : String(err);
+  }
+
+  try {
+    const items = await db.select().from(scrapedItemsTable).limit(1);
+    report.selectAllOk = true;
+    report.sampleReadable = items.length;
+  } catch (err) {
+    report.selectAllOk = false;
+    report.selectAllError = err instanceof Error ? err.message : String(err);
+  }
+
+  res.json(report);
 });
 
 export default router;
