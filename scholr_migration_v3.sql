@@ -26,6 +26,18 @@ ALTER TABLE scraped_items
   ADD COLUMN IF NOT EXISTS verification_status JSONB,
   ADD COLUMN IF NOT EXISTS updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
+-- The original table only allowed pending/approved/rejected. The editorial
+-- API writes needs_review, so adding columns alone is not sufficient: inserts
+-- otherwise fail with a check-constraint violation.
+ALTER TABLE scraped_items DROP CONSTRAINT IF EXISTS scraped_items_status_check;
+ALTER TABLE scraped_items ADD CONSTRAINT scraped_items_status_check CHECK (
+  status IN (
+    'pending', 'enriching', 'enriched', 'needs_metadata', 'needs_images',
+    'needs_review', 'needs_verification', 'scheduled', 'approved', 'published',
+    'archived', 'expired', 'rejected'
+  )
+);
+
 -- Useful index: find items by status quickly
 CREATE INDEX IF NOT EXISTS idx_scraped_items_status ON scraped_items(status);
 CREATE INDEX IF NOT EXISTS idx_scraped_items_quality ON scraped_items(quality_score DESC);

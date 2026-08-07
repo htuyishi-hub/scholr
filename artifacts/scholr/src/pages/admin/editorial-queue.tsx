@@ -61,7 +61,10 @@ async function apiFetch(path: string, opts?: RequestInit) {
     ...opts,
     headers: { Authorization: `Bearer ${TOKEN()}`, "Content-Type": "application/json", ...opts?.headers },
   });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null) as { detail?: string; error?: string } | null;
+    throw new Error(payload?.detail || payload?.error || `Request failed (${res.status})`);
+  }
   return res.json();
 }
 
@@ -294,6 +297,7 @@ export function EditorialQueue() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showLastRun, setShowLastRun] = useState(false);
   const [lastRun, setLastRun] = useState<{ added: number; duplicates: number } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -304,13 +308,16 @@ export function EditorialQueue() {
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     setSelected(new Set());
     try {
       const qs = activeTab === "all" ? "" : `?status=${activeTab}`;
       const data = await apiFetch(`/scraper/items${qs}`);
       setItems(data);
-    } catch {
-      toast({ title: "Error loading items", variant: "destructive" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      setLoadError(message);
+      toast({ title: "Error loading items", description: message, variant: "destructive" });
     }
     setLoading(false);
   }, [activeTab]);
@@ -539,6 +546,17 @@ export function EditorialQueue() {
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
+        </div>
+      ) : loadError ? (
+        <div className="text-center py-20 text-muted-foreground">
+          <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle size={24} className="text-red-500" />
+          </div>
+          <p className="font-medium text-gray-700">Could not load the queue</p>
+          <p className="text-sm mt-1 max-w-xl mx-auto">{loadError}</p>
+          <Button variant="outline" className="mt-4 gap-2" onClick={fetchItems}>
+            <RefreshCw size={13} /> Retry
+          </Button>
         </div>
       ) : sortedItems.length === 0 ? (
         <div className="text-center py-20 text-muted-foreground">
