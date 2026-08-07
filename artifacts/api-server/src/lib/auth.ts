@@ -35,8 +35,13 @@ type TokenClaims = {
   role?: string;
 };
 
-// Access token lifetime: 7 days
-const DEFAULT_EXP_SECONDS = 60 * 60 * 24 * 7;
+// Access token lifetime: 30 days. The client silently refreshes long before
+// this, so an active admin is never logged out mid-session.
+const DEFAULT_EXP_SECONDS = 60 * 60 * 24 * 30;
+
+// A token that expired at most this long ago can still be exchanged for a
+// fresh one (sliding session). Beyond it, the admin must sign in again.
+export const REFRESH_GRACE_SECONDS = 60 * 60 * 24 * 7;
 
 export async function generateToken(userId: string, role?: string): Promise<string> {
   const secret = getJwtSecret();
@@ -58,6 +63,26 @@ export async function getUserIdFromToken(token: string): Promise<string | undefi
     });
 
     return (payload as JWTPayload).sub as string | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Verify a token for the refresh endpoint, tolerating recent expiry so a user
+ * who comes back after a few days keeps their session instead of hitting a
+ * 401 wall.
+ */
+export async function getUserIdForRefresh(token: string): Promise<{ userId: string; role?: string } | undefined> {
+  try {
+    const secret = getJwtSecret();
+    const { payload } = await jwtVerify(token, secret, {
+      algorithms: ["HS256"],
+      clockTolerance: REFRESH_GRACE_SECONDS,
+    });
+    const sub = (payload as JWTPayload).sub;
+    if (!sub) return undefined;
+    return { userId: sub, role: (payload as TokenClaims).role };
   } catch {
     return undefined;
   }

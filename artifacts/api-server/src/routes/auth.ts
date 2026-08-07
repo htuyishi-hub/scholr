@@ -7,6 +7,7 @@ import {
   generateToken,
   storeToken,
   getUserIdFromToken,
+  getUserIdForRefresh,
   removeToken,
 } from "../lib/auth.js";
 
@@ -59,6 +60,38 @@ router.post("/login", async (req, res) => {
 router.post("/logout", async (req, res) => {
   // Stateless JWT: client should simply drop the token.
   res.json({ message: "Logged out" });
+});
+
+// POST /api/auth/refresh
+// Exchanges a still-valid (or recently expired) token for a fresh one so admins
+// keep a sliding session instead of being kicked out by a hard expiry.
+router.post("/refresh", async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  const claims = await getUserIdForRefresh(auth.slice(7));
+  if (!claims) {
+    res.status(401).json({ error: "Invalid or expired token" });
+    return;
+  }
+  try {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, claims.userId))
+      .limit(1);
+    if (!user) {
+      res.status(401).json({ error: "User not found" });
+      return;
+    }
+    const token = await generateToken(user.id, claims.role ?? "admin");
+    res.json({ token });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // GET /api/auth/me

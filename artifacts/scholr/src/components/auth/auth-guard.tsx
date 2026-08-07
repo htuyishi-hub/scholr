@@ -1,24 +1,20 @@
 import { useLocation } from "wouter";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import { useCurrentUser, hasAdminToken, clearAdminToken } from "@/hooks/use-current-user";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { hasValidAdminToken } from "@/lib/admin-session";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { data: user, isLoading, error, enabled } = useCurrentUser();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    // No token at all: redirect immediately without hitting the API.
-    if (!hasAdminToken()) {
-      setLocation("/admin/login");
-      return;
-    }
-    if (!enabled) return;
-    if (isLoading) return;
-    if (!user || error) {
-      // Drop the rejected token first, otherwise the login page bounces us
-      // straight back here and the /api/auth/me 401 storm starts again.
-      clearAdminToken();
+    // No usable token (missing or locally expired): straight to login, no API
+    // call. On a 401 the session hook attempts a silent refresh first and only
+    // clears the token when that fails — so we key the redirect off the token,
+    // never off the error alone. That's what stops the login/guard ping-pong
+    // which used to hammer /api/auth/me.
+    if (!hasValidAdminToken()) {
       setLocation("/admin/login");
     }
   }, [user, isLoading, error, enabled, setLocation]);

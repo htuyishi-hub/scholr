@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLogin } from "@workspace/api-client-react";
+import { hasValidAdminToken, setAdminToken } from "@/lib/admin-session";
 
 export function Login() {
   const [, setLocation] = useLocation();
@@ -22,8 +23,9 @@ export function Login() {
 
   // Redirect if already logged in
   useEffect(() => {
-    const token = localStorage.getItem("scholr_token");
-    if (token) setLocation("/admin/dashboard");
+    // Only bounce back when the stored token is still usable; an expired one
+    // is cleared by hasValidAdminToken so the sign-in form stays put.
+    if (hasValidAdminToken()) setLocation("/admin/dashboard");
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,7 +37,7 @@ export function Login() {
       {
         onSuccess: (data) => {
           if (data.token) {
-            localStorage.setItem("scholr_token", data.token);
+            setAdminToken(data.token);
             setLocation("/admin/dashboard");
           }
         },
