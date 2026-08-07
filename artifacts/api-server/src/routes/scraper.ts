@@ -51,6 +51,39 @@ async function generateUniqueSlug(title: string): Promise<string> {
   }
 }
 
+/**
+ * Normalize a scraped deadline string into a Postgres `date` literal (YYYY-MM-DD).
+ * Scrapers often emit partial or human-readable dates ("2027-10", "October 2027",
+ * "27 August 2026"). Passing those straight into a `date` column throws
+ * `invalid input syntax for type date`, which surfaced as a 500 on approve.
+ * Anything we cannot confidently parse becomes null rather than failing the insert.
+ */
+export function normalizeDeadline(value?: string | null): string | null {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  // Already a full ISO date (optionally with a time component)
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  // Year-month only -> first day of that month
+  const ym = raw.match(/^(\d{4})-(\d{2})$/);
+  if (ym) return `${ym[1]}-${ym[2]}-01`;
+
+  // Year only -> last day of that year (deadlines are end-of-period by convention)
+  const y = raw.match(/^(\d{4})$/);
+  if (y) return `${y[1]}-12-31`;
+
+  // Fall back to Date parsing for human-readable forms
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  return null;
+}
+
 function createPreview(plainText?: string | null, maxChars = 200): string {
   if (!plainText) return "";
   const cleaned = plainText.replace(/\s+/g, " ").trim();
@@ -714,7 +747,7 @@ router.put("/scraper/items/:id/approve", async (req, res) => {
             country,
             category,
             applyLink,
-            deadline: deadline as string | undefined,
+            deadline: normalizeDeadline(deadline as string | null | undefined) ?? undefined,
             status: "published",
             hostOrganization: item.source,
             hostWebsite: item.sourceUrl,
@@ -753,7 +786,7 @@ router.put("/scraper/items/:id/approve", async (req, res) => {
             coverImage: coverImage || item.coverImage || null,
             galleryImages,
             applicationLink: applyLink,
-            deadline: deadline as string | undefined,
+            deadline: normalizeDeadline(deadline as string | null | undefined) ?? undefined,
             status: "published",
             sourceType: "scraped",
             sourceUrl: item.sourceUrl,
