@@ -39,8 +39,8 @@ export function Home() {
     setLocation(`/browse?${params.toString()}`);
   };
 
-  const featured = featuredData || [];
-  const opportunities = listData?.items || [];
+  const featured = Array.isArray(featuredData) ? featuredData : [];
+  const opportunities = Array.isArray(listData?.items) ? listData.items : [];
   const stats = statsData;
 
   return (
