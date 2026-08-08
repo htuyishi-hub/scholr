@@ -54,3 +54,32 @@ Without `VITE_API_BASE_URL` the SPA calls its own Vercel origin and every
 1. Deploy the API on Render, note its URL.
 2. Deploy the frontend on Vercel with `VITE_API_BASE_URL` pointing at it.
 3. Set `CORS_ORIGINS` on Render to the Vercel domain(s) and redeploy the API.
+
+## API on Vercel (same origin)
+
+The Express API now ships as a Vercel Node Serverless Function so
+`https://www.scholr.ink/api/*` is served by the same deployment as the SPA
+(previously those requests hit the static build and returned `405 Method Not
+Allowed`).
+
+How it works:
+
+- `artifacts/api-server/build-vercel.mjs` bundles `src/app.ts` into
+  `api/_server.mjs` during the Vercel build (file is gitignored).
+- `api/index.mjs` exports that Express app as the function handler.
+- `vercel.json` rewrites `/api/(.*)` -> `/api/index`.
+
+Required Vercel Project -> Settings -> Environment Variables (Production +
+Preview):
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | Postgres/Supabase connection string (pooled, `sslmode=require`) |
+| `JWT_SECRET` | Auth token signing secret |
+| `NODE_ENV` | `production` |
+| `SERVE_FRONTEND` | `false` |
+
+Add any optional integration keys (`SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+`AUTH0_*`, storage keys) the same way. Redeploy after saving them — without
+`DATABASE_URL` login returns `500`, and without a deploy the rewrite is not
+active.
