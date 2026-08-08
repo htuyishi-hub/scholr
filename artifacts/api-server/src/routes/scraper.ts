@@ -727,14 +727,16 @@ router.put("/scraper/items/:id/approve", async (req, res) => {
     const deadline = body.deadline ? String(body.deadline) : (item.deadline ?? undefined);
     const category = String(body.category ?? item.category ?? "Scholarships");
     const country = String(body.country ?? item.country ?? "Rwanda");
-    const tags = body.tags ? (body.tags as string[]) : (item.category ? [item.category] : ["Rwanda"]);
-    const images = body.images ? (body.images as string[]) : (item.images ?? []);
-    const galleryImages = images.length ? images : null;
+    // Keep publication writes compatible with the original production tables.
+    // Editorial/enrichment columns are optional and may be deployed separately;
+    // approval must not fail merely because one of those additive columns is absent.
+    let approvalStage = "starting publication";
 
     await db.transaction(async (tx: any) => {
       if (item.itemType === "scholarship") {
         const slug = await generateUniqueSlug(title);
 
+        approvalStage = "creating opportunity";
         const [opp] = await tx
           .insert(opportunitiesTable)
           .values({
@@ -743,23 +745,20 @@ router.put("/scraper/items/:id/approve", async (req, res) => {
             description,
             content,
             coverImage: coverImage || item.coverImage || null,
-            galleryImages,
             country,
             category,
             applyLink,
             deadline: normalizeDeadline(deadline as string | null | undefined) ?? undefined,
             status: "published",
-            hostOrganization: item.source,
-            hostWebsite: item.sourceUrl,
-            tags: tags.length ? tags : ["Rwanda"],
           })
-          .returning();
+          .returning({ id: opportunitiesTable.id, slug: opportunitiesTable.slug });
 
         const existingEvents = (item.auditEvents as AuditEvent[] | null) ?? [];
         existingEvents.push(
           makeAuditEvent("published", `Published as opportunity: ${slug}`, adminId)
         );
 
+        approvalStage = "linking editorial item to opportunity";
         await tx
           .update(scrapedItemsTable)
           .set({
@@ -775,6 +774,7 @@ router.put("/scraper/items/:id/approve", async (req, res) => {
 
         res.json({ created: "opportunity", id: opp.id, slug: opp.slug });
       } else {
+        approvalStage = "creating job";
         const [job] = await tx
           .insert(jobsTable)
           .values({
@@ -784,21 +784,18 @@ router.put("/scraper/items/:id/approve", async (req, res) => {
             description,
             content: content || null,
             coverImage: coverImage || item.coverImage || null,
-            galleryImages,
             applicationLink: applyLink,
             deadline: normalizeDeadline(deadline as string | null | undefined) ?? undefined,
             status: "published",
-            sourceType: "scraped",
-            sourceUrl: item.sourceUrl,
-            sourceName: item.source,
           })
-          .returning();
+          .returning({ id: jobsTable.id });
 
         const existingEvents = (item.auditEvents as AuditEvent[] | null) ?? [];
         existingEvents.push(
           makeAuditEvent("published", `Published as job: ${job.id}`, adminId)
         );
 
+        approvalStage = "linking editorial item to job";
         await tx
           .update(scrapedItemsTable)
           .set({
@@ -816,8 +813,13 @@ router.put("/scraper/items/:id/approve", async (req, res) => {
       }
     });
   } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Internal error", detail: err instanceof Error ? err.message : String(err) });
+    const detail = err instanceof Error ? err.message : String(err);
+    req.log.error({ err, itemId: req.params.id, approvalStage }, "scraper: approval failed");
+    res.status(500).json({
+      error: "Approval failed",
+      stage: approvalStage,
+      detail,
+    });
   }
 });
 
