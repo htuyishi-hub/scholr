@@ -47,3 +47,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Generated Vercel API function bundle
+api/_server.mjs
