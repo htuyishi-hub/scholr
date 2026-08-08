@@ -112,7 +112,7 @@ export function Home() {
           <div className="flex flex-wrap items-center justify-center gap-8 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-2xl font-bold font-serif text-primary" data-testid="text-total-opportunities">
-                {stats ? `${stats.totalOpportunities.toLocaleString()}+` : "2,400+"}
+                {typeof stats?.totalOpportunities === "number" ? `${stats.totalOpportunities.toLocaleString()}+` : "2,400+"}
               </span>
               <span className="text-muted-foreground">Opportunities</span>
             </div>
@@ -120,7 +120,7 @@ export function Home() {
             <div className="flex items-center gap-2">
               <Globe size={16} className="text-primary" />
               <span className="text-2xl font-bold font-serif" data-testid="text-total-countries">
-                {stats ? stats.totalCountries : 45}
+                {typeof stats?.totalCountries === "number" ? stats.totalCountries.toLocaleString() : 45}
               </span>
               <span className="text-muted-foreground">Countries</span>
             </div>
