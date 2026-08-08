@@ -2,12 +2,22 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "npx --yes pnpm@10.26.1 install --frozen-lockfile",
-  "buildCommand": "npx --yes pnpm@10.26.1 -r --filter @workspace/scholr... run build",
+  "buildCommand": "npx --yes pnpm@10.26.1 -r --filter @workspace/scholr... run build && npx --yes pnpm@10.26.1 -r --filter @workspace/api-server... run build && node artifacts/api-server/build-vercel.mjs",
   "outputDirectory": "artifacts/scholr/dist/public",
   "github": {
     "silent": true
   },
+  "functions": {
+    "api/index.mjs": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
     {
       "source": "/((?!api/|assets/).*)",
       "destination": "/index.html"
