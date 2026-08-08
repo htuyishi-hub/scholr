@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
+import { SmartImage } from "@/components/smart-image";
 import {
   ChevronRight,
   Calendar,
@@ -313,10 +314,15 @@ export function OpportunityDetail({ slug }: { slug: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
         <div className="lg:col-span-2">
           {opp.coverImage && (
-            <div className="relative rounded-2xl overflow-hidden mb-8 bg-muted">
-              <img src={opp.coverImage} alt={opp.title} decoding="async" className="w-full max-h-[28rem] object-contain" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-            </div>
+            <figure className="mb-8">
+              <SmartImage
+                src={opp.coverImage}
+                alt={opp.title}
+                eager
+                fit="contain"
+                className="h-[18rem] w-full rounded-2xl sm:h-[24rem] lg:h-[28rem]"
+              />
+            </figure>
           )}
 
           <div className="mb-8">

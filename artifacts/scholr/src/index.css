@@ -312,3 +312,15 @@
     inset: -1px;
   }
 }
+/* Article / editorial imagery: never crop, never overflow, always readable
+   on the dark surface — keeps images looking like the original source. */
+.prose img,
+.article-body img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5rem auto;
+  border-radius: 0.75rem;
+  background-color: hsl(0 0% 100% / 0.04);
+  object-fit: contain;
+}

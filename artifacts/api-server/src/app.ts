@@ -3,11 +3,42 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes/index.js";
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const frontendPublicDir = path.resolve(__dirname, "..", "..", "scholr", "dist", "public");
+
+// The frontend is deployed separately (Vercel). When this build does not ship
+// a bundled SPA, the API runs in pure API mode and never tries to serve HTML.
+const serveFrontend =
+  process.env.SERVE_FRONTEND !== "false" &&
+  fs.existsSync(path.join(frontendPublicDir, "index.html"));
+
+// Cross-origin browsers (Vercel frontend -> Render API) must be allow-listed.
+// Set CORS_ORIGINS to a comma-separated list of exact origins, e.g.
+// "https://scholr.vercel.app,https://www.scholr.com". "*" allows everything.
+const allowedOrigins = (process.env.CORS_ORIGINS ?? "*")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+
+const allowAllOrigins = allowedOrigins.includes("*");
+
+const corsOptions: Parameters<typeof cors>[0] = {
+  origin(origin, callback) {
+    // Same-origin / server-to-server requests have no Origin header.
+    if (!origin || allowAllOrigins || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  maxAge: 86400,
+};
 
 
 import { logger } from "./lib/logger.js";
@@ -24,38 +55,40 @@ app.use((_req, res, next) => {
   next();
 });
 
-// Serve the built React frontend from the monorepo's Vite output.
-// Vite outputs to: artifacts/scholr/dist/public
-app.use(
-  express.static(frontendPublicDir, {
-    index: false,
-    etag: true,
-    setHeaders(res, filePath) {
-      // Vite emits content-hashed filenames under /assets, so they can be
-      // cached immutably. Everything else revalidates.
-      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
-        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-      } else {
-        res.setHeader("Cache-Control", "public, max-age=3600");
-      }
-    },
-  }),
-);
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
-// For SPA routes (anything not starting with /api), fall back to index.html.
-app.use((req, res, next) => {
-  if (req.path.startsWith("/api/") || req.path === "/api") {
-    return next();
-  }
+// Serve the built React frontend from the monorepo's Vite output when it is
+// bundled alongside the API (single-service Render deploy).
+if (serveFrontend) {
+  app.use(
+    express.static(frontendPublicDir, {
+      index: false,
+      etag: true,
+      setHeaders(res, filePath) {
+        // Vite emits content-hashed filenames under /assets, so they can be
+        // cached immutably. Everything else revalidates.
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else {
+          res.setHeader("Cache-Control", "public, max-age=3600");
+        }
+      },
+    }),
+  );
 
-  res.setHeader("Cache-Control", "no-cache");
-  res.sendFile(path.join(frontendPublicDir, "index.html"), (err) => {
-    if (err) next(err);
+  // For SPA routes (anything not starting with /api), fall back to index.html.
+  app.use((req, res, next) => {
+    if (req.path.startsWith("/api/") || req.path === "/api") {
+      return next();
+    }
+
+    res.setHeader("Cache-Control", "no-cache");
+    res.sendFile(path.join(frontendPublicDir, "index.html"), (err) => {
+      if (err) next(err);
+    });
   });
-});
-
-
-
+}
 
 app.use(
   pinoHttp({
@@ -76,7 +109,6 @@ app.use(
     },
   }),
 );
-app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 

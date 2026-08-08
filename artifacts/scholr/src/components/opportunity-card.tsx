@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Calendar, MapPin, DollarSign, ArrowRight, MessageCircle, Star, Pin, Zap, Clock, Globe, Trophy, Flame, BookOpen, Sprout } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SmartImage } from "@/components/smart-image";
 
 interface Opportunity {
   id: string;
@@ -127,13 +128,9 @@ export function OpportunityCard({ opp, large = false }: { opp: Opportunity; larg
         data-testid={`card-opportunity-large-${opp.id}`}
       >
         <Link href={`/opportunity/${opp.slug}`}>
-          <div className="relative h-72 bg-muted overflow-hidden">
-            {opp.coverImage ? (
-              <img src={opp.coverImage} alt={opp.title} loading="lazy" decoding="async" className="w-full h-full object-contain" />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary/20 to-card" />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+          <div className="relative h-72 overflow-hidden">
+            <SmartImage src={opp.coverImage} alt={opp.title} className="h-full w-full" fit="contain" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/85 via-black/45 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-6">
               <div className="flex flex-wrap gap-2 mb-3">
                 <Badge className={`text-xs font-medium border ${fundingBadge.className}`}>{fundingBadge.label}</Badge>
@@ -185,12 +182,8 @@ export function OpportunityCard({ opp, large = false }: { opp: Opportunity; larg
       data-testid={`card-opportunity-${opp.id}`}
     >
       <Link href={`/opportunity/${opp.slug}`} className="block">
-        <div className="relative aspect-video overflow-hidden bg-muted">
-          {opp.coverImage ? (
-            <img src={opp.coverImage} alt={opp.title} loading="lazy" decoding="async" className="w-full h-full object-contain" />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary/10 via-card to-card" />
-          )}
+        <div className="relative aspect-video overflow-hidden">
+          <SmartImage src={opp.coverImage} alt={opp.title} className="h-full w-full" fit="contain" />
           <div className="absolute top-3 left-3 flex gap-2 flex-wrap">
             <Badge className={`text-xs font-medium border ${fundingBadge.className}`}>{fundingBadge.label}</Badge>
             {opp.featured && <Badge className="bg-primary/20 text-primary border-primary/30 text-xs"><Star size={10} className="mr-1" />Pick</Badge>}
