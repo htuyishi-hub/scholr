@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "corepack enable && pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm -r --filter @workspace/scholr... run build",
+  "installCommand": "npx --yes pnpm@10.26.1 install --frozen-lockfile",
+  "buildCommand": "npx --yes pnpm@10.26.1 -r --filter @workspace/scholr... run build",
   "outputDirectory": "artifacts/scholr/dist/public",
   "github": { "silent": true },
   "rewrites": [{ "source": "/((?!assets/).*)", "destination": "/index.html" }],

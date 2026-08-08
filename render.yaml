@@ -7,11 +7,12 @@ services:
     region: oregon
     plan: free
     rootDir: .
+    # Render's image ships a read-only /usr/bin, so `corepack enable` fails.
+    # Use npx to run the pinned pnpm instead.
     buildCommand: >-
-      corepack enable &&
-      pnpm install --frozen-lockfile &&
-      pnpm -r --filter @workspace/api-server... run build
-    startCommand: cd artifacts/api-server && pnpm start
+      npx --yes pnpm@10.26.1 install --frozen-lockfile &&
+      npx --yes pnpm@10.26.1 -r --filter @workspace/api-server... run build
+    startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
     healthCheckPath: /api/healthz
     envVars:
       - key: NODE_ENV
