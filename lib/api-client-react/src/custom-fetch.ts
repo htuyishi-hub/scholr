@@ -305,6 +305,11 @@ function inferResponseType(response: Response): "json" | "text" | "blob" {
   const mediaType = getMediaType(response.headers);
 
   if (isJsonMediaType(mediaType)) return "json";
+  // An HTML body on an API route means the request never reached the API
+  // server (SPA catch-all rewrite, proxy misconfiguration, error page).
+  // Returning the HTML string would poison typed callers that expect arrays
+  // or objects, so surface it as a parse error instead.
+  if (mediaType === "text/html" || mediaType === "application/xhtml+xml") return "json";
   if (isTextMediaType(mediaType) || mediaType == null) return "text";
   return "blob";
 }
