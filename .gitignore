@@ -50,3 +50,4 @@ Thumbs.db
 
 # Generated Vercel API function bundle
 api/_server.mjs
+artifacts/scholr/api/_server.mjs

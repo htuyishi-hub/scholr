@@ -9,11 +9,15 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { rm, mkdir } from "node:fs/promises";
+import { rm, mkdir, copyFile } from "node:fs/promises";
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(artifactDir, "..", "..");
-const outFile = path.join(repoRoot, "api", "_server.mjs");
+// The active Vercel project uses artifacts/scholr as its Root Directory, so
+// the function bundle must exist inside that directory. Keep a second copy at
+// the repository root for deployments configured from the monorepo root.
+const outFile = path.join(repoRoot, "artifacts", "scholr", "api", "_server.mjs");
+const rootOutFile = path.join(repoRoot, "api", "_server.mjs");
 
 globalThis.require = createRequire(import.meta.url);
 
@@ -66,6 +70,9 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
 `,
     },
   });
+
+  await mkdir(path.dirname(rootOutFile), { recursive: true });
+  await copyFile(outFile, rootOutFile);
 }
 
 build().catch((err) => {
