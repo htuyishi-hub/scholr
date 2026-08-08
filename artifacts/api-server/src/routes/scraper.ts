@@ -705,6 +705,7 @@ router.put("/scraper/items/:id/approve", async (req, res) => {
   const adminId = await getAdminId(req);
   if (!adminId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
+  let approvalStage = "loading editorial item";
   try {
     const [item] = await db
       .select()
@@ -730,7 +731,7 @@ router.put("/scraper/items/:id/approve", async (req, res) => {
     // Keep publication writes compatible with the original production tables.
     // Editorial/enrichment columns are optional and may be deployed separately;
     // approval must not fail merely because one of those additive columns is absent.
-    let approvalStage = "starting publication";
+    approvalStage = "starting publication";
 
     await db.transaction(async (tx: any) => {
       if (item.itemType === "scholarship") {
