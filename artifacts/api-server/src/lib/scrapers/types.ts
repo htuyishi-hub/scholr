@@ -68,7 +68,7 @@ export async function fetchHtml(url: string): Promise<string | null> {
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; ScholrBot/1.0; +https://scholr.rw)",
+        "User-Agent": "Mozilla/5.0 (compatible; ScholrBot/1.0; +https://scholr.ink)",
         Accept: "text/html,application/xhtml+xml",
       },
     });

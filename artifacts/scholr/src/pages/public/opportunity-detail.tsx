@@ -26,6 +26,7 @@ import { Separator } from "@/components/ui/separator";
 import { OpportunityCard } from "@/components/opportunity-card";
 import { ApplyWithUsModal } from "@/components/apply-with-us-modal";
 import { useStudent } from "@/hooks/use-student-auth";
+import { Seo, SITE_URL, cleanDescription, toAbsoluteUrl } from "@/components/seo";
 import {
   useGetOpportunityBySlug,
   useIncrementOpportunityViews,
@@ -294,9 +295,49 @@ export function OpportunityDetail({ slug }: { slug: string }) {
   const isExpired = !!deadline && deadline < new Date();
   const whatsappUrl = `https://wa.me/${(opp.whatsappNumber || "1234567890").replace(/\D/g, "")}?text=${encodeURIComponent(`Hi! I need help applying to: ${opp.title}`)}`;
   const contentLines = (opp.content || opp.description || "").split("\n\n");
+  const detailTitle = opp.seoTitle || `${opp.title}${opp.amount ? ` — ${opp.amount}` : opp.category ? ` ${opp.category}` : ""} | scholr`;
+  const detailDescription = cleanDescription(
+    opp.metaDescription || opp.description || opp.content,
+    `${opp.title}${opp.country ? ` in ${opp.country}` : ""}. Explore eligibility, funding details, deadlines and how to apply on scholr.`,
+  );
+  const publishedDate = opp.createdAt ? new Date(opp.createdAt).toISOString() : null;
+  const modifiedDate = opp.updatedAt ? new Date(opp.updatedAt).toISOString() : publishedDate;
+  const canonicalPath = `/opportunity/${opp.slug}`;
+  const imageUrl = toAbsoluteUrl(opp.coverImage);
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "ScholarlyArticle",
+    headline: opp.title,
+    image: {
+      "@type": "ImageObject",
+      url: imageUrl,
+      width: 1280,
+      height: 720,
+    },
+    author: { "@type": "Organization", name: "scholr.ink" },
+    publisher: {
+      "@type": "Organization",
+      name: "scholr.ink",
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/favicon.svg` },
+    },
+    datePublished: publishedDate,
+    dateModified: modifiedDate,
+    description: detailDescription,
+    mainEntityOfPage: { "@type": "WebPage", "@id": `${SITE_URL}${canonicalPath}` },
+  };
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-8">
+      <Seo
+        title={detailTitle}
+        description={detailDescription}
+        path={canonicalPath}
+        image={imageUrl}
+        type="article"
+        publishedTime={publishedDate}
+        modifiedTime={modifiedDate}
+        jsonLd={structuredData}
+      />
       <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6" aria-label="breadcrumb">
         <Link href="/" className="hover:text-primary transition-colors">Home</Link>
         <ChevronRight size={14} />
@@ -317,7 +358,7 @@ export function OpportunityDetail({ slug }: { slug: string }) {
             <figure className="mb-8">
               <SmartImage
                 src={opp.coverImage}
-                alt={opp.title}
+                alt={`${opp.title}${opp.country ? ` in ${opp.country}` : ""} cover image`}
                 eager
                 fit="contain"
                 className="h-[18rem] w-full rounded-2xl sm:h-[24rem] lg:h-[28rem]"
@@ -344,10 +385,16 @@ export function OpportunityDetail({ slug }: { slug: string }) {
 
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
               {opp.createdAt && (
-                <span className="flex items-center gap-1">
+                <time dateTime={new Date(opp.createdAt).toISOString()} className="flex items-center gap-1">
                   <Calendar size={13} />
                   Posted {new Date(opp.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                </span>
+                </time>
+              )}
+              {opp.updatedAt && (
+                <time dateTime={new Date(opp.updatedAt).toISOString()} className="flex items-center gap-1">
+                  <Calendar size={13} />
+                  Updated {new Date(opp.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </time>
               )}
               <span className="flex items-center gap-1">
                 <Eye size={13} />

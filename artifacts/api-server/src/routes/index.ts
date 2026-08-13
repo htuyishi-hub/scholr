@@ -12,6 +12,7 @@ import aiRouter from "./ai.js";
 import storageRouter from "./storage.js";
 import jobsRouter from "./jobs.js";
 import scraperRouter from "./scraper.js";
+import seoRouter from "./seo.js";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use("/ai", aiRouter);
 router.use(storageRouter);
 router.use(jobsRouter);
 router.use(scraperRouter);
+router.use(seoRouter);
 
 export default router;

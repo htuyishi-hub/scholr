@@ -50,6 +50,8 @@ export function SmartImage({
         <img
           src={src}
           alt=""
+          width={1280}
+          height={720}
           aria-hidden="true"
           referrerPolicy="no-referrer"
           loading={eager ? "eager" : "lazy"}
@@ -60,6 +62,8 @@ export function SmartImage({
       <img
         src={src}
         alt={alt}
+        width={1280}
+        height={720}
         referrerPolicy="no-referrer"
         loading={eager ? "eager" : "lazy"}
         decoding="async"

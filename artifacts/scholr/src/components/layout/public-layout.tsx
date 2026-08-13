@@ -4,6 +4,7 @@ import { MessageCircle, Menu, X, User, GraduationCap, LogOut, Briefcase } from "
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useStudent } from "@/hooks/use-student-auth";
+import { Seo } from "@/components/seo";
 
 const WA_NUMBER = "250723611110";
 const WA_GROUP = "https://chat.whatsapp.com/GBKpjZSDCEk74RPTZje3hX";
@@ -23,7 +24,7 @@ const SOCIALS = [
   },
   {
     name: "Instagram",
-    href: "https://instagram.com/scholr.rw",
+    href: "https://instagram.com/scholr.ink",
     color: "#E1306C",
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -53,7 +54,7 @@ const SOCIALS = [
   },
   {
     name: "Facebook",
-    href: "https://facebook.com/scholr.rw",
+    href: "https://facebook.com/scholr.ink",
     color: "#1877F2",
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -63,7 +64,7 @@ const SOCIALS = [
   },
   {
     name: "TikTok",
-    href: "https://tiktok.com/@scholr.rw",
+    href: "https://tiktok.com/@scholr.ink",
     color: "#010101",
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -78,6 +79,56 @@ export function PublicLayout({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
   const { student, logout } = useStudent();
+  const pageSeo = (() => {
+    if (location === "/") {
+      return {
+        title: "Scholarships, Fellowships & Grants | scholr",
+        description: "Find verified scholarships, fellowships, grants and jobs from around the world, curated for ambitious students.",
+        path: "/",
+      };
+    }
+    if (location.startsWith("/browse")) {
+      return {
+        title: "Browse Scholarships & Fellowships | scholr",
+        description: "Browse verified scholarships, fellowships, grants and internships by category, country, funding type and deadline.",
+        path: "/browse",
+      };
+    }
+    if (location.startsWith("/jobs")) {
+      return {
+        title: "Jobs, Internships & Career Opportunities | scholr",
+        description: "Discover jobs, internships and career opportunities in Rwanda and beyond, with practical details for every application.",
+        path: "/jobs",
+      };
+    }
+    if (location.startsWith("/find-my-scholarship")) {
+      return {
+        title: "Find Scholarships That Match You | scholr",
+        description: "Answer six quick questions to discover scholarships and funding opportunities matched to your study goals.",
+        path: "/find-my-scholarship",
+      };
+    }
+    if (location.startsWith("/about")) {
+      return {
+        title: "About scholr | Curated Student Funding",
+        description: "Learn how scholr helps students find verified scholarships, fellowships and grants without searching hundreds of websites.",
+        path: "/about",
+      };
+    }
+    if (location.startsWith("/login")) {
+      return { title: "Student Login | scholr", description: "Sign in to your scholr account to track applications and find matched scholarships.", path: "/login" };
+    }
+    if (location.startsWith("/register")) {
+      return { title: "Create a Student Account | scholr", description: "Create a free scholr account to find and apply to scholarships tailored to your goals.", path: "/register" };
+    }
+    if (location.startsWith("/dashboard")) {
+      return { title: "Student Dashboard | scholr", description: "Manage your scholr profile, matched opportunities and application progress.", path: "/dashboard", noindex: true };
+    }
+    if (location.startsWith("/profile")) {
+      return { title: "Student Profile | scholr", description: "Keep your scholr student profile up to date for better scholarship matches.", path: "/profile", noindex: true };
+    }
+    return { title: "scholr — Student Funding Opportunities", description: "Verified scholarships, fellowships, grants and jobs for ambitious students worldwide.", path: location };
+  })();
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -96,6 +147,7 @@ export function PublicLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary selection:text-primary-foreground">
+      <Seo {...pageSeo} />
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b border-transparent ${
           isScrolled ? "bg-background/80 backdrop-blur-md border-border shadow-sm py-3" : "bg-transparent py-5"
