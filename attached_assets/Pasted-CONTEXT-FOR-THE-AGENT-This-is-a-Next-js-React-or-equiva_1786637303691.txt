@@ -1,0 +1,164 @@
+CONTEXT FOR THE AGENT
+
+This is a Next.js/React (or equivalent) site at scholr.ink listing scholarships, fellowships, and grants. It is currently not indexed by Google at all — a site:scholr.ink search returns zero results. The root cause is a canonical tag conflict. Fix issues in the order listed. After each numbered section, run the verification command described before moving to the next.
+
+1. FIX THE CANONICAL DOMAIN CONFLICT (BLOCKING — DO THIS FIRST)
+
+Problem: Every page's canonical tag currently points to https://scholr.rw/ instead of https://scholr.ink/. This tells Google "the real content lives elsewhere," which can suppress indexing of scholr.ink entirely.
+
+Task:
+
+Find every instance of canonical URL generation in the codebase (search for scholr.rw, canonical, rel="canonical")
+Change all canonical URLs to self-reference https://scholr.ink using the current page's own path — e.g. a page at /scholarships/fulbright-2026 must output:
+html
+  <link rel="canonical" href="https://scholr.ink/scholarships/fulbright-2026" />
+If scholr.rw is meant to be a legitimate secondary domain, set up a proper 301 redirect from scholr.rw → scholr.ink instead of a conflicting canonical. Do NOT leave both domains live with contradicting canonicals.
+Search the entire codebase for hardcoded references to scholr.rw in metadata, sitemap generation, og:url, and structured data — replace all with scholr.ink.
+
+Verify: View source on 3 different page types (homepage, category page, scholarship detail page) and confirm every canonical tag says scholr.ink, not scholr.rw.
+
+2. CONFIRM CRAWLABILITY
+
+Task:
+
+Check robots.txt at the site root — confirm it does NOT disallow Googlebot from any page you want indexed
+Confirm there is no <meta name="robots" content="noindex"> anywhere on public scholarship pages (check both hardcoded HTML and any CMS/environment-based conditional that might set noindex on staging vs. production)
+Generate or update sitemap.xml to include every scholarship detail page, category page, and article, using absolute scholr.ink URLs
+Submit the sitemap in Google Search Console after deployment
+
+Verify: Fetch https://scholr.ink/robots.txt and https://scholr.ink/sitemap.xml directly and confirm they list scholr.ink URLs correctly with no blanket disallow rules.
+
+3. IMAGE IDENTIFICATION — THIS IS THE MOST IMPORTANT ITEM FOR DISCOVER
+
+Discover is a visual feed. Google will not show large-card previews — and often won't show a page at all in Discover — unless it can clearly identify, measure, and trust the image tied to each page. This is not optional polish; treat it as a hard requirement.
+
+3a. Absolute image URLs
+
+Every og:image must be a full absolute URL, never a relative path.
+
+Wrong: <meta property="og:image" content="/opengraph.jpg">
+Right: <meta property="og:image" content="https://scholr.ink/opengraph.jpg">
+
+Fix this globally — search the codebase for og:image generation and ensure it always concatenates the full domain.
+
+3b. Declare image dimensions explicitly
+
+Every page must include:
+
+html
+<meta property="og:image" content="https://scholr.ink/images/[unique-image].jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="720">
+<meta property="og:image:type" content="image/jpeg">
+
+Dimensions must be true to the actual file — pull them programmatically from the image at build/upload time rather than hardcoding, so they never go out of sync.
+
+3c. Every image must meet Discover's minimum specs
+Minimum width: 1200px
+Aspect ratio: 16:9 (landscape)
+Minimum total pixels: 300,000+
+Real, unique photography or illustration relevant to the specific scholarship/content — never the site logo, never a generic stock photo reused across many pages
+
+Task for the agent: Write a build-time or CI check that scans all images used as og:image across the site and flags any that are below 1200px width, not 16:9, or duplicated across more than one listing.
+
+3d. Unique image per listing (no duplicate/logo fallback)
+
+Audit the scholarship listing template — if there's a fallback image used when a specific listing has no custom photo, that fallback is very likely the site logo or a generic placeholder. Replace this pattern:
+
+Require every scholarship entry to have its own unique image before it can be published, OR
+If a fallback is unavoidable, use a category-specific relevant image (e.g., a generic "graduate cap" photo for scholarships, "science lab" for STEM grants) — never the site logo, never blank/placeholder art
+3e. Alt text on every image
+
+Every <img> tag must have descriptive, specific alt text — not generic (alt="scholarship") but specific to the content (alt="University of Oxford campus, home of the Rhodes Scholarship"). This feeds both accessibility and Google's image understanding, which factors into Discover's content-matching.
+
+3f. Structured data must reference the image as an ImageObject with explicit dimensions
+
+In the JSON-LD block (see Section 4), the image field should be a full ImageObject, not just a URL string:
+
+json
+"image": {
+  "@type": "ImageObject",
+  "url": "https://scholr.ink/images/fulbright-scholarship-1280x720.jpg",
+  "width": 1280,
+  "height": 720
+}
+
+Verify: Pick 5 random scholarship pages, view source, and confirm each has a unique, absolute, correctly-dimensioned image with matching og:image, alt text, and JSON-LD ImageObject.
+
+4. STRUCTURED DATA (JSON-LD)
+
+Task: Add a ScholarlyArticle (or Article) JSON-LD block to every scholarship detail page, populated dynamically from the listing's own data — not a copy-pasted static template:
+
+json
+{
+  "@context": "https://schema.org",
+  "@type": "ScholarlyArticle",
+  "headline": "[Dynamic: scholarship name + year]",
+  "image": {
+    "@type": "ImageObject",
+    "url": "[Dynamic: absolute image URL]",
+    "width": 1280,
+    "height": 720
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "scholr.ink"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "scholr.ink",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://scholr.ink/logo.png"
+    }
+  },
+  "datePublished": "[Dynamic: ISO 8601]",
+  "dateModified": "[Dynamic: ISO 8601]",
+  "description": "[Dynamic: unique 1-2 sentence summary, not truncated boilerplate]",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "[Dynamic: canonical scholr.ink URL]"
+  }
+}
+
+Verify: Run 5 sample pages through Google's Rich Results Test and confirm no errors.
+
+5. ROBOTS META TAG FOR LARGE IMAGE PREVIEWS
+
+Add to every public page's <head>:
+
+html
+<meta name="robots" content="max-image-preview:large">
+6. UNIQUE, NON-TEMPLATED TITLES AND DESCRIPTIONS
+
+Task: Audit the listing template for duplicate title/description patterns (e.g., every page outputting "[Name] Scholarship — scholr.ink" with no other variation). Each page needs:
+
+A unique <title> describing that specific scholarship (amount, eligibility, or region — not just the name)
+A unique meta description, not a truncated copy of another field
+No clickbait phrasing ("You won't believe," "This changes everything")
+7. VISIBLE DATES AND AUTHORSHIP
+
+Add machine-readable, visible publish/update dates to every listing:
+
+html
+<time datetime="2026-08-13">Updated: August 13, 2026</time>
+
+Ensure this renders in the raw HTML (not injected client-side only after JS load), so it's visible to crawlers that don't fully execute JS.
+
+8. INTERNAL LINKING
+
+Add a "Related Scholarships" or "Similar Opportunities" block to each listing page, linking to 3-5 other listings in the same category. This is a template-level change, not manual per-page work.
+
+POST-DEPLOYMENT CHECKLIST
+
+After deploying all of the above:
+
+ Verify canonical tags across all page types
+ Submit updated sitemap.xml in Google Search Console
+ Request indexing for 5-10 key pages manually in Search Console
+ Run Rich Results Test on JSON-LD
+ Run PageSpeed Insights (mobile) on 3 representative pages
+ Re-check site:scholr.ink weekly until pages start appearing
+ Once indexed, monitor the Discover tab in Search Console Performance report (it won't appear until Google has enough trust/history with the domain)
+
+Important: None of this guarantees a top Discover placement — Discover ranking is personalized per-user and Google gives no guarantees to anyone. This checklist removes the technical disqualifiers so the content has a fair chance to be considered.
