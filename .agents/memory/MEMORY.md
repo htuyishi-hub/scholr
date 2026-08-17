@@ -1,0 +1,2 @@
+- [pnpm version mismatch fix](pnpm-version.md) — packageManager must match installed Nix pnpm; pnpm@11 self-install crashes on Node 24 in this env.
+- [Editorial workspace architecture](editorial-workspace.md) — pipeline states, new API routes, quality score, DB migration v3.

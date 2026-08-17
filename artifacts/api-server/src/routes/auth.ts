@@ -1,0 +1,130 @@
+import { Router } from "express";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import {
+  hashPassword,
+  verifyPassword,
+  generateToken,
+  storeToken,
+  getUserIdFromToken,
+  getUserIdForRefresh,
+  removeToken,
+} from "../lib/auth.js";
+
+
+const router = Router();
+
+// POST /api/auth/login
+router.post("/login", async (req, res) => {
+  const { email, password } = req.body as { email: string; password: string };
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password required" });
+    return;
+  }
+  try {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, email.toLowerCase().trim()))
+      .limit(1);
+
+    if (!user || !verifyPassword(password, user.passwordHash)) {
+      res.status(401).json({ error: "Invalid email or password" });
+      return;
+    }
+
+    await db
+      .update(usersTable)
+      .set({ lastActive: new Date() })
+      .where(eq(usersTable.id, user.id));
+
+    const token = await generateToken(user.id, "admin");
+    // tokens are stateless (JWT), no server-side storage
+
+
+    const { passwordHash: _, ...safeUser } = user;
+    const postsCount = 0;
+
+    res.json({
+      user: { ...safeUser, postsCount, lastActive: user.lastActive?.toISOString() ?? null },
+      token,
+    });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/auth/logout
+// POST /api/auth/logout
+router.post("/logout", async (req, res) => {
+  // Stateless JWT: client should simply drop the token.
+  res.json({ message: "Logged out" });
+});
+
+// POST /api/auth/refresh
+// Exchanges a still-valid (or recently expired) token for a fresh one so admins
+// keep a sliding session instead of being kicked out by a hard expiry.
+router.post("/refresh", async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  const claims = await getUserIdForRefresh(auth.slice(7));
+  if (!claims) {
+    res.status(401).json({ error: "Invalid or expired token" });
+    return;
+  }
+  try {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, claims.userId))
+      .limit(1);
+    if (!user) {
+      res.status(401).json({ error: "User not found" });
+      return;
+    }
+    const token = await generateToken(user.id, claims.role ?? "admin");
+    res.json({ token });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/auth/me
+router.get("/me", async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  const token = auth.slice(7);
+  const userId = await getUserIdFromToken(token);
+  if (!userId) {
+    res.status(401).json({ error: "Invalid or expired token" });
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    if (!user) {
+      res.status(401).json({ error: "User not found" });
+      return;
+    }
+    const { passwordHash: _, ...safeUser } = user;
+    res.json({ ...safeUser, postsCount: 0, lastActive: user.lastActive?.toISOString() ?? null });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+export default router;

@@ -1,0 +1,157 @@
+modules = ["nodejs-20", "web"]
+
+[deployment]
+router = "application"
+deploymentTarget = "autoscale"
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "here"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "new hold"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "git"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "name"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "email"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "check"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "bg"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Scholr web"
+
+[[workflows.workflow]]
+name = "here"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git status"
+
+[[workflows.workflow]]
+name = "new hold"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git add ."
+
+[[workflows.workflow]]
+name = "git"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git config --global user.name"
+
+[[workflows.workflow]]
+name = "name"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git config --global user.name \"htuyishi-hub\""
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "email"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git config --global user.email \"htuyishi@gmail.com\""
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "check"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git config --global --list"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "bg"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git reflog --date=local -20"
+
+[[workflows.workflow]]
+name = "Scholr web"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/scholr run dev"
+waitForPort = 3000
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
+
+[nix]
+channel = "stable-25_05"
+
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+[[ports]]
+localPort = 26123
+externalPort = 3000

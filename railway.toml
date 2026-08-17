@@ -1,0 +1,22 @@
+
+# Railway config
+# NOTE: Railway TOML does not support the YAML-like `services:` array used above.
+# This file is kept minimal so the Railway config parser succeeds.
+
+[build]
+
+
+[start]
+command = "cd artifacts/api-server && pnpm start"
+
+[healthcheck]
+path = "/api/healthz"
+intervalSeconds = 10
+timeoutSeconds = 5
+failureThreshold = 3
+
+[env]
+NODE_ENV = "production"
+
+
+

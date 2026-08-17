@@ -1,0 +1,106 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npx --yes pnpm@10.26.1 install --frozen-lockfile",
+  "buildCommand": "npx --yes pnpm@10.26.1 -r --filter @workspace/scholr... run build && npx --yes pnpm@10.26.1 -r --filter @workspace/api-server... run build && node artifacts/api-server/build-vercel.mjs",
+  "outputDirectory": "artifacts/scholr/dist/public",
+  "github": {
+    "silent": true
+  },
+  "functions": {
+    "api/index.mjs": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.scholr.ink" }],
+      "destination": "https://scholr.ink/:path*",
+      "statusCode": 301
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap.xml"
+    },
+    {
+      "source": "/opportunity/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/countries/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/institutions/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/funders/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/fields/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/deadlines/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/((?!api/|assets/|opportunity/|countries/|institutions/|funders/|fields/|deadlines/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://scholr.ink https://www.scholr.ink"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "pnpm run build && node ../api-server/build-vercel.mjs",
+  "outputDirectory": "dist/public",
+  "functions": {
+    "api/index.mjs": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.scholr.ink" }],
+      "destination": "https://scholr.ink/:path*",
+      "statusCode": 301
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/opportunity/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/countries/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/institutions/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/funders/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/fields/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/deadlines/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/((?!api/|assets/|opportunity/|countries/|institutions/|funders/|fields/|deadlines/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

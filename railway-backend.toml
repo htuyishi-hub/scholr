@@ -1,0 +1,29 @@
+# Railway config for backend service (Express API)
+# Project root: artifacts/api-server
+
+services:
+  - name: scholarship-api
+    type: web
+
+    # Railway Builder
+    build:
+      # install + build from this monorepo workspace
+      command: "pnpm install --frozen-lockfile && pnpm -r --filter @workspace/api-server run build"
+
+    start:
+      # api-server index.ts requires PORT env var (Railway provides it)
+      command: "cd artifacts/api-server && pnpm run start"
+
+    # Railway uses PORT for web containers.
+    # Healthcheck endpoint is mounted at /api/healthz
+    healthcheck:
+      path: /api/healthz
+      intervalSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+    # If you want to set backend env vars, add them here.
+    env:
+      - key: NODE_ENV
+        value: production
+
