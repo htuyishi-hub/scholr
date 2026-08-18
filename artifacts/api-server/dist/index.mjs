@@ -27932,7 +27932,7 @@ var require_pino = __commonJS({
     function pinoBundlerAbsolutePath(p) {
       try {
         const path2 = __require("path");
-        const outputDir = "/tmp/cc-agent/70033710/project/artifacts/api-server/dist";
+        const outputDir = "/home/honore/Downloads/project 2/artifacts/api-server/dist";
         return path2.resolve(outputDir, p.replace(/^\.\//, ""));
       } catch (e) {
         const f = new Function("p", "return new URL(p, import.meta.url).pathname");
@@ -79916,11 +79916,14 @@ app.use((0, import_cors.default)(corsOptions));
 app.options(/.*/, (0, import_cors.default)(corsOptions));
 app.use((req, res, next) => {
   const host = req.headers.host;
-  if (host?.toLowerCase() === "www.scholr.ink") {
+  const hostname2 = host?.split(":")[0].toLowerCase();
+  if (hostname2 === "www.scholr.ink") {
     const origin = req.headers.origin;
     if (origin && (allowAllOrigins || allowedOrigins.includes(origin))) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
     }
     res.redirect(301, `${SITE_ORIGIN}${req.originalUrl}`);
     return;

@@ -96,13 +96,17 @@ app.options(/.*/, cors(corsOptions));
 
 app.use((req, res, next) => {
   const host = req.headers.host;
-  if (host?.toLowerCase() === "www.scholr.ink") {
+  // Normalize host by stripping any port (e.g. "www.scholr.ink:443")
+  const hostname = host?.split(":")[0].toLowerCase();
+  if (hostname === "www.scholr.ink") {
     // Explicitly set CORS headers on the redirect response so browsers
     // don't block the redirected fetch (fixes www -> bare domain CORS errors).
     const origin = req.headers.origin;
     if (origin && (allowAllOrigins || allowedOrigins.includes(origin))) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
     }
     res.redirect(301, `${SITE_ORIGIN}${req.originalUrl}`);
     return;
