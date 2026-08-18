@@ -18,6 +18,7 @@
     }
   ],
   "env": {
+    "PORT": "3000",
     "SITE_URL": "https://scholr.ink",
     "CORS_ORIGINS": "https://scholr.ink,https://www.scholr.ink"
   },

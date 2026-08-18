@@ -5,7 +5,7 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 
-const rawPort = process.env.PORT ?? "3000";
+const rawPort = process.env.PORT && process.env.PORT.trim() ? process.env.PORT.trim() : "3000";
 
 const port = Number(rawPort);
 
