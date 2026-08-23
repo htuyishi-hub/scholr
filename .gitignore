@@ -1,0 +1,16 @@
+node_modules/
+.tmp-playwright/
+
+.bash_profile
+.bashrc
+.gitconfig
+.profile
+.ripgreprc
+.zprofile
+.zshrc
+
+.idea/
+.vscode/
+.mcp.json
+
+node_modules/.pnpm-workspace-state-v1.json

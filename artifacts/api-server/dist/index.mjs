@@ -78515,7 +78515,19 @@ function jsonLd(listing) {
   }
   if (listing.deadline) program.applicationDeadline = new Date(listing.deadline).toISOString().slice(0, 10);
   if (listing.studyLevel?.length) program.educationalProgramMode = listing.studyLevel.join(", ");
-  if (listing.coverImage) program.image = listing.coverImage;
+  function isValidImageUrl(u) {
+    if (!u) return false;
+    try {
+      const parsed = new URL(u);
+      if (!/^https?:$/i.test(parsed.protocol)) return false;
+      if (/chatgpt\.com\/s\//i.test(u)) return false;
+      if (/^data:/i.test(u)) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  if (isValidImageUrl(listing.coverImage)) program.image = listing.coverImage;
   if (listing.amount) program.offers = { "@type": "Offer", price: listing.amount, category: "Scholarship" };
   const crumbs = [
     { name: "Home", item: SITE_ORIGIN },
@@ -78544,6 +78556,7 @@ function validateListingForPublish(listing) {
   const slug = String(listing.slug ?? "");
   const summary = String(listing.metaDescription || listing.description || "");
   const sourceUrl = listing.applyLink || listing.hostWebsite;
+  const text2 = `${listing.title ?? ""} ${listing.description ?? ""} ${listing.content ?? ""} ${listing.hostOrganization ?? ""}`;
   if (!title) errors.push("title: missing");
   else if (isPlaceholderTitle(title)) errors.push(`title: placeholder or too generic (${listing.title})`);
   if (!slug) errors.push("slug: missing");
@@ -78552,14 +78565,19 @@ function validateListingForPublish(listing) {
   }
   if (!summary.trim()) errors.push("summary: missing");
   else if (stripHtml(summary).length < 80) warnings.push("summary: shorter than 80 chars");
-  if (!listing.country) errors.push("country_scope: missing");
-  else {
-    const text2 = `${listing.title ?? ""} ${listing.description ?? ""} ${listing.content ?? ""} ${listing.hostOrganization ?? ""}`;
-    if (listing.country === "Rwanda" && !/\brwanda/i.test(text2)) {
-      errors.push("country_scope: says Rwanda but source text never mentions Rwanda");
+  if (!listing.country) {
+    warnings.push("country_scope: missing");
+  } else if (listing.country === "Rwanda" && !/\brwanda/i.test(text2)) {
+    errors.push("country_scope: says Rwanda but source text never mentions Rwanda");
+  }
+  if (!listing.deadline) {
+    const hasRollingDeadlineSignal = /rolling|open\s+until|no\s+fixed\s+deadline|applications\s+open|continuing\s+applications|accepting\s+applications/i.test(text2);
+    if (hasRollingDeadlineSignal) {
+      warnings.push("deadline: rolling or open-ended");
+    } else {
+      warnings.push("deadline: missing");
     }
   }
-  if (!listing.deadline) errors.push("deadline: missing");
   if (!sourceUrl) errors.push("source_url: missing official source link");
   return { ok: errors.length === 0, errors, warnings };
 }

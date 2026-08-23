@@ -163,7 +163,21 @@ export function jsonLd(listing: ListingSeoRecord): object[] {
   }
   if (listing.deadline) program.applicationDeadline = new Date(listing.deadline).toISOString().slice(0, 10);
   if (listing.studyLevel?.length) program.educationalProgramMode = listing.studyLevel.join(", ");
-  if (listing.coverImage) program.image = listing.coverImage;
+  function isValidImageUrl(u?: string | null) {
+    if (!u) return false;
+    try {
+      const parsed = new URL(u);
+      if (!/^https?:$/i.test(parsed.protocol)) return false;
+      // Block known unstable/share hosts
+      if (/chatgpt\.com\/s\//i.test(u)) return false;
+      if (/^data:/i.test(u)) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  if (isValidImageUrl(listing.coverImage)) program.image = listing.coverImage;
   if (listing.amount) program.offers = { "@type": "Offer", price: listing.amount, category: "Scholarship" };
 
   const crumbs = [

@@ -17,12 +17,17 @@
       "statusCode": 301
     }
   ],
+
   "env": {
     "PORT": "3000",
     "SITE_URL": "https://scholr.ink",
     "CORS_ORIGINS": "https://scholr.ink,https://www.scholr.ink"
   },
   "rewrites": [
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap.xml"
+    },
     {
       "source": "/opportunity/:slug",
       "destination": "/api/index"
