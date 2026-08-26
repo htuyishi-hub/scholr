@@ -43,6 +43,9 @@ const StudentProfile = lazyNamed(() => import("@/pages/public/student-profile"),
 const FindScholarship = lazyNamed(() => import("@/pages/public/find-scholarship"), "FindScholarship");
 const Jobs = lazyNamed(() => import("@/pages/public/jobs"), "Jobs");
 const Auth0Callback = lazyNamed(() => import("@/pages/public/auth0-callback"), "Auth0Callback");
+const Universities = lazyNamed(() => import("@/pages/universities/Universities"), "Universities");
+const UniversityOfRwanda = lazyNamed(() => import("@/pages/universities/UniversityOfRwanda"), "UniversityOfRwanda");
+const RwandaPolytechnic = lazyNamed(() => import("@/pages/universities/RwandaPolytechnic"), "RwandaPolytechnic");
 
 const Login = lazyNamed(() => import("@/pages/admin/login"), "Login");
 const Dashboard = lazyNamed(() => import("@/pages/admin/dashboard"), "Dashboard");
@@ -165,6 +168,15 @@ function Router() {
       </Route>
       <Route path="/jobs">
         <PublicLayout><Jobs /></PublicLayout>
+      </Route>
+      <Route path="/universities">
+        <PublicLayout><Universities /></PublicLayout>
+      </Route>
+      <Route path="/universities/university-of-rwanda">
+        <PublicLayout><UniversityOfRwanda /></PublicLayout>
+      </Route>
+      <Route path="/universities/rwanda-polytechnic">
+        <PublicLayout><RwandaPolytechnic /></PublicLayout>
       </Route>
       <Route path="/opportunity/:slug">
         {params => <PublicLayout><OpportunityDetail slug={params.slug} /></PublicLayout>}
