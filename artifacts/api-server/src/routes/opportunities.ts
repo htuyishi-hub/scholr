@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, opportunitiesTable, usersTable, activityTable } from "@workspace/db";
 import { eq, desc, asc, ilike, and, or, sql, inArray, lt, lte } from "drizzle-orm";
 import { getUserIdFromToken } from "../lib/auth.js";
+import { normalizeOpportunityStructuredData } from "../lib/opportunity-structure.js";
 
 const router = Router();
 
@@ -19,9 +20,11 @@ function toISO(d: unknown): string | null {
 }
 
 function mapOpp(opp: Record<string, unknown>, author?: Record<string, unknown> | null) {
+  const structuredData = (opp.structuredData ?? null) as Record<string, unknown> | null;
   return {
     ...opp,
     deadline: opp.deadline ? String(opp.deadline) : null,
+    structuredData: structuredData ?? null,
     createdAt: toISO(opp.createdAt),
     updatedAt: toISO(opp.updatedAt),
     author: author
@@ -33,6 +36,21 @@ function mapOpp(opp: Record<string, unknown>, author?: Record<string, unknown> |
         }
       : null,
   };
+}
+
+function buildStructuredPayload(body: Record<string, unknown>, fallbackTitle?: string): Record<string, unknown> | null {
+  const structuredValue = body.structuredData ?? {
+    title: fallbackTitle ?? body.title ?? null,
+    overview: (body.description as string | null) ?? null,
+    country: (body.country as string | null) ?? null,
+    applicationUrl: (body.applyLink as string | null) ?? null,
+    funding: body.fundingType ? { status: body.fundingType as string } : null,
+    studyLevels: Array.isArray(body.studyLevel) ? body.studyLevel as string[] : null,
+    deadline: (body.deadline as string | null) ?? null,
+    applicationSteps: typeof body.content === "string" && body.content.trim().length > 0 ? [body.content] : [],
+  };
+
+  return normalizeOpportunityStructuredData(structuredValue, fallbackTitle ?? (typeof body.title === "string" ? body.title : null)) ?? null;
 }
 
 // GET /api/opportunities
@@ -259,6 +277,7 @@ router.post("/", async (req, res) => {
       slug = `${slug}-${Date.now()}`;
     }
 
+    const structuredData = buildStructuredPayload(body, title);
     const [opp] = await db
       .insert(opportunitiesTable)
       .values({
@@ -276,6 +295,7 @@ router.post("/", async (req, res) => {
         applyLink: body.applyLink as string | null ?? null,
         whatsappNumber: body.whatsappNumber as string | null ?? null,
         tags: body.tags as string[] | null ?? null,
+        structuredData: structuredData ?? null,
         status: (body.status as "draft" | "published" | "archived") ?? "draft",
         featured: Boolean(body.featured),
         pinned: Boolean(body.pinned),
@@ -315,6 +335,10 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const body = req.body as Record<string, unknown>;
+    const structuredData = body.structuredData !== undefined || body.content !== undefined || body.description !== undefined
+      ? buildStructuredPayload(body as Record<string, unknown>, (body.title as string | null) ?? undefined)
+      : undefined;
+
     const [opp] = await db
       .update(opportunitiesTable)
       .set({
@@ -331,6 +355,7 @@ router.put("/:id", async (req, res) => {
         ...(body.applyLink !== undefined && { applyLink: body.applyLink as string | null }),
         ...(body.whatsappNumber !== undefined && { whatsappNumber: body.whatsappNumber as string | null }),
         ...(body.tags !== undefined && { tags: body.tags as string[] | null }),
+        ...(structuredData !== undefined && { structuredData }),
         ...(body.status !== undefined && { status: body.status as "draft" | "published" | "archived" }),
         ...(body.featured !== undefined && { featured: Boolean(body.featured) }),
         ...(body.pinned !== undefined && { pinned: Boolean(body.pinned) }),

@@ -9,6 +9,7 @@ import { validateListingForPublish } from "../lib/listingSeo.js";
 import { persistImage } from "../lib/imagePipeline.js";
 import type { ScrapedResult } from "../lib/scrapers/types.js";
 import { htmlToPlainText } from "../lib/scrapers/types.js";
+import { normalizeOpportunityStructuredData } from "../lib/opportunity-structure.js";
 import type { AuditEvent, QualityIssue } from "@workspace/db";
 
 const router = Router();
@@ -772,6 +773,20 @@ router.put("/scraper/items/:id/approve", async (req, res) => {
           }
         }
 
+        const structuredData = normalizeOpportunityStructuredData(
+          {
+            title,
+            overview: description,
+            country: typeof country === "string" ? country : null,
+            applicationUrl: applyLink,
+            deadline: normalizedDeadline ?? null,
+            funding: { status: "funded" },
+            studyLevels: item.academicLevel ?? null,
+            applicationSteps: content ? [content] : [],
+          },
+          title
+        );
+
         approvalStage = "creating opportunity";
         const [opp] = await tx
           .insert(opportunitiesTable)
@@ -785,6 +800,7 @@ router.put("/scraper/items/:id/approve", async (req, res) => {
             category,
             applyLink,
             deadline: normalizedDeadline ?? undefined,
+            structuredData: structuredData ?? null,
             status: "published",
           })
           .returning({ id: opportunitiesTable.id, slug: opportunitiesTable.slug });

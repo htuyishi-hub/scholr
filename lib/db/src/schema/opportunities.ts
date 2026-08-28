@@ -7,6 +7,7 @@ import {
   integer,
   date,
   numeric,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -29,6 +30,7 @@ export const opportunitiesTable = pgTable("opportunities", {
   applyLink: text("apply_link"),
   whatsappNumber: text("whatsapp_number"),
   tags: text("tags").array(),
+  structuredData: jsonb("structured_data").$type<Record<string, unknown>>(),
   status: text("status", { enum: ["draft", "published", "archived"] })
     .notNull()
     .default("draft"),

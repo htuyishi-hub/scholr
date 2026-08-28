@@ -3,6 +3,7 @@ import { useGetOpportunityBySlug, useIncrementOpportunityViews } from "@workspac
 import OpportunityTemplate from "../opportunity/OpportunityTemplate";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { normalizeOpportunityStructuredData } from "@/lib/opportunity-structure";
 
 export function OpportunityDetail({ slug }: { slug: string }) {
   const { data: opp, isLoading } = useGetOpportunityBySlug(slug, { query: { enabled: !!slug } as any });
@@ -26,6 +27,8 @@ export function OpportunityDetail({ slug }: { slug: string }) {
       </div>
     );
 
+  const structuredData = normalizeOpportunityStructuredData((opp as any)?.structuredData ?? (opp as any)?.content ?? undefined, opp.title);
+
   const mappedOpp = {
     slug: opp.slug,
     title: opp.title,
@@ -33,12 +36,20 @@ export function OpportunityDetail({ slug }: { slug: string }) {
     description: opp.content || opp.description || "",
     host: opp.hostOrganization ? { name: String(opp.hostOrganization.name || opp.host || ""), url: opp.hostOrganization.url } : { name: opp.host || "" },
     country: opp.country ? { name: opp.country, url: `/countries/${String(opp.country).toLowerCase().replace(/\s+/g, "-")}` } : undefined,
-    deadline: opp.deadline || null,
-    level: Array.isArray(opp.studyLevel) ? opp.studyLevel.join(", ") : opp.studyLevel || undefined,
-    funding: opp.fundingType === "full" ? "Fully funded" : opp.fundingType || undefined,
-    applyLink: opp.applyLink || opp.applyUrl || undefined,
-    eligibility: opp.eligibility || "",
-    applicationProcess: opp.applicationProcess || opp.howToApply || "",
+    deadline: opp.deadline || structuredData?.deadline || null,
+    level: Array.isArray(opp.studyLevel) ? opp.studyLevel.join(", ") : opp.studyLevel || structuredData?.studyLevels?.join(", ") || undefined,
+    funding: opp.fundingType === "full" ? "Fully funded" : opp.fundingType || structuredData?.funding?.status || undefined,
+    applyLink: opp.applyLink || opp.applyUrl || structuredData?.applicationUrl || undefined,
+    eligibility: structuredData?.eligibility?.length ? structuredData.eligibility : (opp.eligibility || ""),
+    applicationProcess: structuredData?.applicationSteps?.length ? structuredData.applicationSteps : (opp.applicationProcess || opp.howToApply || ""),
+    overview: structuredData?.overview || opp.content || opp.description || "",
+    responsibilities: structuredData?.responsibilities ?? [],
+    requirements: structuredData?.requirements ?? [],
+    benefits: structuredData?.benefits ?? [],
+    faq: structuredData?.faq ?? [],
+    importantDates: structuredData?.importantDates ?? [],
+    requiredDocuments: structuredData?.requiredDocuments ?? [],
+    contact: structuredData?.contact ?? null,
     coverImage: opp.coverImage || opp.image || null,
   };
 

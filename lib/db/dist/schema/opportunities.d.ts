@@ -353,6 +353,25 @@ export declare const opportunitiesTable: import("drizzle-orm/pg-core").PgTableWi
             }, {}, {}, import("drizzle-orm").ColumnBuilderExtraConfig>;
             size: undefined;
         }>;
+        structuredData: import("drizzle-orm/pg-core").PgColumn<{
+            name: "structured_data";
+            tableName: "opportunities";
+            dataType: "json";
+            columnType: "PgJsonb";
+            data: Record<string, unknown>;
+            driverParam: unknown;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            $type: Record<string, unknown>;
+        }>;
         status: import("drizzle-orm/pg-core").PgColumn<{
             name: "status";
             tableName: "opportunities";
@@ -969,6 +988,7 @@ export declare const insertOpportunitySchema: z.ZodObject<{
     applyLink: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     whatsappNumber: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     tags: z.ZodOptional<z.ZodNullable<z.ZodArray<z.ZodString>>>;
+    structuredData: z.ZodOptional<z.ZodNullable<z.ZodType<Record<string, unknown>, Record<string, unknown>, z.core.$ZodTypeInternals<Record<string, unknown>, Record<string, unknown>>>>>;
     status: z.ZodOptional<z.ZodEnum<{
         draft: "draft";
         published: "published";

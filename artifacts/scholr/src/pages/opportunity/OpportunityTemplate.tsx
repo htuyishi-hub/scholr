@@ -3,6 +3,20 @@ import Meta, { defaultOrganizationJsonLd } from "../../components/seo/Meta";
 import Breadcrumb, { breadcrumbJsonLd } from "../../components/Breadcrumb";
 import QuickFacts from "../../components/QuickFacts";
 
+function renderList(items: Array<string | { question?: string; answer?: string }> | undefined | null) {
+  if (!items || items.length === 0) return null;
+
+  return (
+    <ul className="list-disc pl-5 space-y-2">
+      {items.map((item, index) => {
+        if (typeof item === "string") return <li key={index}>{item}</li>;
+        if (item && item.question && item.answer) return <li key={index}><strong>{item.question}:</strong> {item.answer}</li>;
+        return null;
+      })}
+    </ul>
+  );
+}
+
 export default function OpportunityTemplate({ opportunity }: { opportunity: any }) {
   const url = `https://scholr.ink/opportunity/${opportunity.slug}`;
   const crumbs = [
@@ -12,6 +26,18 @@ export default function OpportunityTemplate({ opportunity }: { opportunity: any 
     { name: opportunity.host?.name || "Host", url: opportunity.host?.url },
     { name: opportunity.title, url },
   ];
+
+  const sections = [
+    opportunity.overview ? { title: "Overview", body: <div dangerouslySetInnerHTML={{ __html: opportunity.overview }} /> } : null,
+    opportunity.responsibilities?.length ? { title: "Responsibilities", body: renderList(opportunity.responsibilities) } : null,
+    opportunity.eligibility?.length ? { title: "Eligibility", body: renderList(opportunity.eligibility) } : null,
+    opportunity.requirements?.length ? { title: "Requirements", body: renderList(opportunity.requirements) } : null,
+    opportunity.benefits?.length ? { title: "Benefits", body: renderList(opportunity.benefits) } : null,
+    opportunity.applicationProcess?.length ? { title: "Application process", body: renderList(opportunity.applicationProcess) } : null,
+    opportunity.importantDates?.length ? { title: "Important dates", body: renderList(opportunity.importantDates.map((date: any) => `${date.label}${date.date ? `: ${date.date}` : ""}${date.note ? ` — ${date.note}` : ""}`)) } : null,
+    opportunity.faq?.length ? { title: "FAQ", body: renderList(opportunity.faq) } : null,
+    opportunity.contact ? { title: "Contact", body: <div>{opportunity.contact.institution && <p>{opportunity.contact.institution}</p>}{opportunity.contact.department && <p>{opportunity.contact.department}</p>}{opportunity.contact.email && <p>{opportunity.contact.email}</p>}</div> } : null,
+  ].filter(Boolean);
 
   const jsonLd = [
     defaultOrganizationJsonLd("https://scholr.ink"),
@@ -41,20 +67,12 @@ export default function OpportunityTemplate({ opportunity }: { opportunity: any 
         applyLink={opportunity.applyLink}
       />
 
-      <section>
-        <h2>Overview</h2>
-        <div dangerouslySetInnerHTML={{ __html: opportunity.description || "" }} />
-      </section>
-
-      <section>
-        <h2>Eligibility</h2>
-        <div dangerouslySetInnerHTML={{ __html: opportunity.eligibility || "" }} />
-      </section>
-
-      <section>
-        <h2>Application process</h2>
-        <div dangerouslySetInnerHTML={{ __html: opportunity.applicationProcess || "" }} />
-      </section>
+      {sections.map((section: any) => (
+        <section key={section.title} className="mt-8">
+          <h2>{section.title}</h2>
+          {section.body}
+        </section>
+      ))}
     </article>
   );
 }
