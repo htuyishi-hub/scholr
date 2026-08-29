@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import OpportunityTemplate from "../opportunity/OpportunityTemplate";
 import { normalizeOpportunityStructuredData } from "@/lib/opportunity-structure";
+import { convertGoogleDriveLink } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -552,7 +553,7 @@ export function PostsForm({ id }: { id?: string }) {
                     <Input
                       placeholder="https://example.com/image.jpg"
                       value={form.coverImage}
-                      onChange={e => setField("coverImage", e.target.value)}
+                      onChange={e => setField("coverImage", convertGoogleDriveLink(e.target.value))}
                       className="mt-3 rounded-xl text-sm"
                       data-testid="input-cover-image-url"
                     />

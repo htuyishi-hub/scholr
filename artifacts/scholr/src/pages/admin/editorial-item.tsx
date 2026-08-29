@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { convertGoogleDriveLink } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -682,7 +683,7 @@ export function EditorialItem({ id }: { id: string }) {
                   <label className="text-xs text-muted-foreground mb-1 block">Or paste image URL</label>
                   <Input
                     value={merged.coverImage ?? ""}
-                    onChange={(e) => updateForm({ coverImage: e.target.value })}
+                    onChange={(e) => updateForm({ coverImage: convertGoogleDriveLink(e.target.value) })}
                     placeholder="https://…"
                     className="text-xs border-gray-200 h-8"
                   />
