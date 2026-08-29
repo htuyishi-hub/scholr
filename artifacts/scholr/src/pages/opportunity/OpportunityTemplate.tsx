@@ -30,7 +30,7 @@ export default function OpportunityTemplate({ opportunity }: { opportunity: any 
   ];
 
   const sections = [
-    opportunity.overview ? { title: "Overview", body: <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: opportunity.overview.replace(/\n/g, '<br />') }} /> } : null,
+    opportunity.overview ? { title: "Overview", body: <div className="prose dark:prose-invert max-w-none text-foreground/90" dangerouslySetInnerHTML={{ __html: opportunity.overview.replace(/\n/g, '<br />') }} /> } : null,
     opportunity.responsibilities?.length ? { title: "What You'll Do", body: renderList(opportunity.responsibilities) } : null,
     opportunity.eligibility?.length ? { title: "Eligibility", body: renderList(opportunity.eligibility) } : null,
     opportunity.requirements?.length ? { title: "Requirements", body: renderList(opportunity.requirements) } : null,
@@ -108,7 +108,7 @@ export default function OpportunityTemplate({ opportunity }: { opportunity: any 
         {sections.map((section: any) => (
           <section key={section.title} className="space-y-4">
             <h2 className="text-2xl font-bold font-serif">{section.title}</h2>
-            <div className="text-muted-foreground leading-relaxed">
+            <div className="text-foreground/90 leading-relaxed">
               {section.body}
             </div>
           </section>

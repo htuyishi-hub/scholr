@@ -74532,6 +74532,7 @@ var opportunitiesTable = pgTable("opportunities", {
   applyLink: text("apply_link"),
   whatsappNumber: text("whatsapp_number"),
   tags: text("tags").array(),
+  structuredData: jsonb("structured_data").$type(),
   status: text("status", { enum: ["draft", "published", "archived"] }).notNull().default("draft"),
   featured: boolean("featured").notNull().default(false),
   pinned: boolean("pinned").notNull().default(false),
@@ -74920,6 +74921,279 @@ var auth_default = router2;
 // src/routes/opportunities.ts
 var import_express3 = __toESM(require_express2(), 1);
 init_auth();
+
+// src/lib/opportunity-structure.ts
+var LABELED_SECTION_ALIASES = {
+  overview: "overview",
+  about: "overview",
+  description: "overview",
+  "who can apply": "eligibility",
+  eligibility: "eligibility",
+  "eligibility criteria": "eligibility",
+  "requirements & qualifications": "requirements",
+  requirements: "requirements",
+  "qualifications": "requirements",
+  benefits: "benefits",
+  funding: "benefits",
+  "financial support": "benefits",
+  "required documents": "requiredDocuments",
+  documents: "requiredDocuments",
+  "application documents": "requiredDocuments",
+  "application process": "applicationSteps",
+  "how to apply": "applicationSteps",
+  "application procedure": "applicationSteps",
+  "important dates": "importantDates",
+  "key dates": "importantDates",
+  timeline: "importantDates",
+  faq: "faq",
+  "frequently asked questions": "faq",
+  contact: "contact",
+  "contact information": "contact",
+  "what you'll do": "responsibilities",
+  "responsibilities": "responsibilities",
+  "location": "location",
+  "work mode": "workMode"
+};
+var LIST_PREFIX = /^(?:[-*•]\s*|\d+[.)]\s*)/;
+function normalizeWhitespace(value) {
+  return value.replace(/\r/g, "").replace(/\s+/g, " ").trim();
+}
+function slugifyLabel(label) {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+function firstMatch(text2, regex) {
+  const match = text2.match(regex);
+  return match ? match[1].trim() : null;
+}
+function isLikelySectionHeader(line2) {
+  const trimmed = line2.trim();
+  if (!trimmed) return false;
+  const key = slugifyLabel(trimmed.replace(/:$/, ""));
+  return Object.prototype.hasOwnProperty.call(LABELED_SECTION_ALIASES, key) || /^\w[\w &/()'-]*:?$/.test(trimmed);
+}
+function parseListItems(text2) {
+  if (!text2) return [];
+  const lines = text2.split(/\n+/).map((line2) => line2.trim()).filter(Boolean);
+  const items = [];
+  for (const raw of lines) {
+    const item = raw.replace(LIST_PREFIX, "").trim();
+    if (!item) continue;
+    if (item.length > 2) items.push(item.replace(/\s+/g, " ").trim());
+  }
+  if (items.length) return items;
+  return normalizeWhitespace(text2).split(/;\s*|\.\s+(?=[A-Z])/).map((part) => part.trim()).filter(Boolean).slice(0, 12);
+}
+function parseFaqBlocks(text2) {
+  const lines = text2.split(/\n+/).map((line2) => line2.trim()).filter(Boolean);
+  const faq = [];
+  let currentQ = null;
+  let currentA = [];
+  for (const raw of lines) {
+    const qMatch = raw.match(/^(?:Q(?:uestion)?\s*[:\-]\s*|\d+\.\s*)(.+)$/i);
+    if (qMatch) {
+      if (currentQ) faq.push({ question: currentQ, answer: currentA.join(" ").trim() });
+      currentQ = qMatch[1].trim();
+      currentA = [];
+      continue;
+    }
+    const aMatch = raw.match(/^(?:A(?:nswer)?\s*[:\-]\s*)(.+)$/i);
+    if (aMatch && currentQ) {
+      currentA.push(aMatch[1].trim());
+      continue;
+    }
+    if (currentQ) {
+      currentA.push(raw);
+    }
+  }
+  if (currentQ) faq.push({ question: currentQ, answer: currentA.join(" ").trim() });
+  return faq.filter((entry) => entry.question && entry.answer);
+}
+function parseImportantDates(text2) {
+  const items = [];
+  const lines = text2.split(/\n+/).map((line2) => line2.trim()).filter(Boolean);
+  for (const line2 of lines) {
+    const match = line2.match(/^([^:]+):\s*(.+)$/);
+    if (!match) {
+      if (line2.length > 0 && items.length) {
+        const last = items[items.length - 1];
+        last.note = [last.note, line2].filter(Boolean).join(" ");
+      }
+      continue;
+    }
+    const label = match[1].trim();
+    const value = match[2].trim();
+    const dateMatch = value.match(/(\d{4}-\d{2}-\d{2}|\d{4}-\d{2}|\d{4}|[A-Z][a-z]+ \d{1,2}, \d{4}|\d{1,2} [A-Z][a-z]+ \d{4})/);
+    items.push({
+      label,
+      date: dateMatch ? dateMatch[1] : null,
+      note: value.replace(dateMatch?.[1] ?? "", "").trim() || null
+    });
+  }
+  return items.filter((item) => item.label);
+}
+function parseContact(text2) {
+  const contact = {};
+  const emailMatch = text2.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  if (emailMatch) contact.email = emailMatch[0];
+  const lines = text2.split(/\n+/).map((line2) => line2.trim()).filter(Boolean);
+  const nonEmailLines = lines.filter((line2) => !/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(line2));
+  if (nonEmailLines.length) {
+    contact.institution = nonEmailLines[0];
+    contact.department = nonEmailLines.slice(1).join(" ") || null;
+  }
+  return emailMatch || contact.institution ? contact : null;
+}
+function parseFunding(text2) {
+  const value = normalizeWhitespace(text2);
+  if (!value) return null;
+  const amountMatch = value.match(/(?:CHF|USD|EUR|GBP|KES|RWF|USD|CAD|AUD)\s*([0-9][0-9,\.]*)/i);
+  const numeric2 = Number((amountMatch?.[1] ?? "").replace(/,/g, ""));
+  const currency = amountMatch ? (value.match(/(CHF|USD|EUR|GBP|KES|RWF|CAD|AUD)/i) ?? [])[1] ?? null : null;
+  const status = /fully funded|full funding|stipend|grant/i.test(value) ? /fully funded|full funding/i.test(value) ? "fully_funded" : /stipend/i.test(value) ? "stipend" : "funded" : /partial|scholarship/i.test(value) ? "partial" : null;
+  return {
+    status,
+    amount: Number.isFinite(numeric2) ? numeric2 : null,
+    currency: currency ?? null,
+    frequency: /monthly/i.test(value) ? "monthly" : /annual|yearly/i.test(value) ? "annual" : null,
+    description: value || null
+  };
+}
+function parseListLikeSection(text2) {
+  const rows = parseListItems(text2);
+  return rows.length ? rows : [normalizeWhitespace(text2) || ""].filter(Boolean);
+}
+function parseStructuredSections(rawText) {
+  const normalized = rawText.replace(/\r/g, "").trim();
+  if (!normalized) return {};
+  const lines = normalized.split(/\n+/).map((line2) => line2.trim()).filter(Boolean);
+  const sections = {};
+  let currentKey = null;
+  for (const rawLine of lines) {
+    const headingMatch = rawLine.match(/^([A-Za-z0-9 &/()'-]+)\s*:\s*(.*)$/);
+    if (headingMatch) {
+      const label = headingMatch[1].trim();
+      const key = Object.keys(LABELED_SECTION_ALIASES).find((alias) => slugifyLabel(alias) === slugifyLabel(label));
+      const canonical = key ? LABELED_SECTION_ALIASES[key] : null;
+      if (canonical) {
+        currentKey = canonical;
+        const rest = headingMatch[2].trim();
+        if (rest) {
+          sections[canonical] = sections[canonical] ?? [];
+          sections[canonical].push(rest);
+        }
+        continue;
+      }
+      const fallback = slugifyLabel(label);
+      if (isLikelySectionHeader(rawLine)) {
+        currentKey = fallback;
+        if (headingMatch[2].trim()) {
+          sections[fallback] = sections[fallback] ?? [];
+          sections[fallback].push(headingMatch[2].trim());
+        }
+        continue;
+      }
+    }
+    if (currentKey) {
+      sections[currentKey] = sections[currentKey] ?? [];
+      sections[currentKey].push(rawLine);
+    }
+  }
+  const result = {};
+  for (const [key, values] of Object.entries(sections)) {
+    const joined = values.join("\n").trim();
+    if (!joined) continue;
+    if (key === "overview") result.overview = joined;
+    else if (key === "eligibility") result.eligibility = parseListLikeSection(joined);
+    else if (key === "requirements") result.requirements = parseListLikeSection(joined);
+    else if (key === "responsibilities") result.responsibilities = parseListLikeSection(joined);
+    else if (key === "benefits") {
+      const list = parseListLikeSection(joined);
+      result.benefits = list;
+      const funding = parseFunding(joined);
+      if (funding) result.funding = funding;
+    } else if (key === "requiredDocuments") {
+      const list = parseListLikeSection(joined);
+      result.requiredDocuments = list.map((item) => ({
+        name: item.replace(/\s*[-•]\s*/, "").trim(),
+        description: null
+      }));
+    } else if (key === "applicationSteps") result.applicationSteps = parseListLikeSection(joined);
+    else if (key === "importantDates") result.importantDates = parseImportantDates(joined);
+    else if (key === "faq") result.faq = parseFaqBlocks(joined);
+    else if (key === "contact") result.contact = parseContact(joined);
+  }
+  if (!result.overview && rawText) result.overview = normalizeWhitespace(rawText.slice(0, 1400));
+  const cityMatch = rawText.match(/(?:in|at)\s+([A-Z][a-zA-Z.-]+(?:\s+[A-Z][a-zA-Z.-]+)*)/);
+  if (cityMatch) result.city = cityMatch[1].trim();
+  const countryMatch = rawText.match(/(?:Country|Location|Location:|Based in)\s*[:\-]?\s*([A-Z][A-Za-z .'-]+)/i);
+  if (countryMatch) result.country = countryMatch[1].trim();
+  const applyUrl = firstMatch(rawText, /https?:\/\/[^\s]+/i) ?? firstMatch(rawText, /(?:apply|application|submit)\s*[:\-]?\s*(https?:\/\/[^\s]+)/i);
+  if (applyUrl) result.applicationUrl = applyUrl;
+  const workModeText = rawText.toLowerCase();
+  if (/remote|virtual|online/i.test(workModeText)) result.workMode = "remote";
+  else if (/hybrid/i.test(workModeText)) result.workMode = "hybrid";
+  else if (/in[- ]person|onsite|on-site|in person|at the office/i.test(workModeText)) result.workMode = "in_person";
+  const durationMatch = rawText.match(/(?:duration|length|term|program duration)\s*[:\-]?\s*([A-Za-z0-9–-]+(?:\s+[A-Za-z0-9–-]+){0,5})/i);
+  if (durationMatch) result.duration = durationMatch[1].trim();
+  const startDateMatch = rawText.match(/(?:Earliest Session Start Date|Start Date|Program Start)\s*[:\-]?\s*(\d{4}-\d{2}|[A-Z][a-z]+ \d{4}|\d{4})/i);
+  if (startDateMatch) result.startDate = startDateMatch[1].trim();
+  const deadlineMatch = rawText.match(/(?:Application Deadline|Deadline)\s*[:\-]?\s*(\d{4}-\d{2}-\d{2}|\d{4}-\d{2}|[A-Z][a-z]+ \d{1,2}, \d{4}|\d{1,2} [A-Z][a-z]+ \d{4})/i);
+  if (deadlineMatch) result.deadline = deadlineMatch[1].trim();
+  const studyLevelMatches = [];
+  const lower = rawText.toLowerCase();
+  if (/(undergraduate|bachelor)/i.test(lower)) studyLevelMatches.push("undergraduate");
+  if (/(master|masters|graduate)/i.test(lower)) studyLevelMatches.push("masters");
+  if (/(phd|doctoral|doctoral degree)/i.test(lower)) studyLevelMatches.push("phd");
+  if (/(postdoc|postdoctoral)/i.test(lower)) studyLevelMatches.push("postdoc");
+  if (studyLevelMatches.length) result.studyLevels = [...new Set(studyLevelMatches)];
+  const contact = result.contact;
+  if (contact && !contact.email && !contact.institution) {
+    result.contact = null;
+  }
+  return result;
+}
+function normalizeOpportunityStructuredData(rawValue, fallbackTitle) {
+  if (!rawValue) {
+    return fallbackTitle ? { title: fallbackTitle } : null;
+  }
+  if (typeof rawValue === "string") {
+    const parsed = parseStructuredSections(rawValue);
+    return {
+      title: fallbackTitle ?? null,
+      ...parsed
+    };
+  }
+  if (typeof rawValue === "object") {
+    const structured = rawValue;
+    return {
+      title: structured.title ?? fallbackTitle ?? null,
+      hostInstitution: structured.hostInstitution ?? null,
+      country: structured.country ?? null,
+      city: structured.city ?? null,
+      studyLevels: Array.isArray(structured.studyLevels) ? structured.studyLevels : null,
+      deadline: structured.deadline ?? null,
+      startDate: structured.startDate ?? null,
+      duration: structured.duration ?? null,
+      workMode: structured.workMode ?? null,
+      overview: structured.overview ?? null,
+      responsibilities: Array.isArray(structured.responsibilities) ? structured.responsibilities : [],
+      eligibility: Array.isArray(structured.eligibility) ? structured.eligibility : [],
+      requirements: Array.isArray(structured.requirements) ? structured.requirements : [],
+      benefits: Array.isArray(structured.benefits) ? structured.benefits : [],
+      funding: structured.funding,
+      requiredDocuments: Array.isArray(structured.requiredDocuments) ? structured.requiredDocuments : [],
+      applicationSteps: Array.isArray(structured.applicationSteps) ? structured.applicationSteps : [],
+      importantDates: Array.isArray(structured.importantDates) ? structured.importantDates : [],
+      faq: Array.isArray(structured.faq) ? structured.faq : [],
+      contact: structured.contact,
+      applicationUrl: structured.applicationUrl ?? null,
+      internationalStudentInfo: structured.internationalStudentInfo ?? null
+    };
+  }
+  return fallbackTitle ? { title: fallbackTitle } : null;
+}
+
+// src/routes/opportunities.ts
 var router3 = (0, import_express3.Router)();
 function slugify(text2) {
   return text2.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -74930,9 +75204,11 @@ function toISO(d) {
   return String(d);
 }
 function mapOpp(opp, author) {
+  const structuredData = opp.structuredData ?? null;
   return {
     ...opp,
     deadline: opp.deadline ? String(opp.deadline) : null,
+    structuredData: structuredData ?? null,
     createdAt: toISO(opp.createdAt),
     updatedAt: toISO(opp.updatedAt),
     author: author ? {
@@ -74942,6 +75218,19 @@ function mapOpp(opp, author) {
       createdAt: toISO(author.createdAt)
     } : null
   };
+}
+function buildStructuredPayload(body, fallbackTitle) {
+  const structuredValue = body.structuredData ?? {
+    title: fallbackTitle ?? body.title ?? null,
+    overview: body.description ?? null,
+    country: body.country ?? null,
+    applicationUrl: body.applyLink ?? null,
+    funding: body.fundingType ? { status: body.fundingType } : null,
+    studyLevels: Array.isArray(body.studyLevel) ? body.studyLevel : null,
+    deadline: body.deadline ?? null,
+    applicationSteps: typeof body.content === "string" && body.content.trim().length > 0 ? [body.content] : []
+  };
+  return normalizeOpportunityStructuredData(structuredValue, fallbackTitle ?? (typeof body.title === "string" ? body.title : null)) ?? null;
 }
 router3.get("/", async (req, res) => {
   try {
@@ -75094,6 +75383,7 @@ router3.post("/", async (req, res) => {
     if (existing.length > 0) {
       slug = `${slug}-${Date.now()}`;
     }
+    const structuredData = buildStructuredPayload(body, title);
     const [opp] = await db.insert(opportunitiesTable).values({
       title,
       slug,
@@ -75109,6 +75399,7 @@ router3.post("/", async (req, res) => {
       applyLink: body.applyLink ?? null,
       whatsappNumber: body.whatsappNumber ?? null,
       tags: body.tags ?? null,
+      structuredData: structuredData ?? null,
       status: body.status ?? "draft",
       featured: Boolean(body.featured),
       pinned: Boolean(body.pinned),
@@ -75143,6 +75434,7 @@ router3.post("/", async (req, res) => {
 router3.put("/:id", async (req, res) => {
   try {
     const body = req.body;
+    const structuredData = body.structuredData !== void 0 || body.content !== void 0 || body.description !== void 0 ? buildStructuredPayload(body, body.title ?? void 0) : void 0;
     const [opp] = await db.update(opportunitiesTable).set({
       ...body.title !== void 0 && { title: body.title },
       ...body.description !== void 0 && { description: body.description },
@@ -75157,6 +75449,7 @@ router3.put("/:id", async (req, res) => {
       ...body.applyLink !== void 0 && { applyLink: body.applyLink },
       ...body.whatsappNumber !== void 0 && { whatsappNumber: body.whatsappNumber },
       ...body.tags !== void 0 && { tags: body.tags },
+      ...structuredData !== void 0 && { structuredData },
       ...body.status !== void 0 && { status: body.status },
       ...body.featured !== void 0 && { featured: Boolean(body.featured) },
       ...body.pinned !== void 0 && { pinned: Boolean(body.pinned) },
@@ -79231,6 +79524,19 @@ router13.put("/scraper/items/:id/approve", async (req, res) => {
           } catch {
           }
         }
+        const structuredData = normalizeOpportunityStructuredData(
+          {
+            title,
+            overview: description,
+            country: typeof country === "string" ? country : null,
+            applicationUrl: applyLink,
+            deadline: normalizedDeadline ?? null,
+            funding: { status: "funded" },
+            studyLevels: item.academicLevel ?? null,
+            applicationSteps: content ? [content] : []
+          },
+          title
+        );
         approvalStage = "creating opportunity";
         const [opp] = await tx.insert(opportunitiesTable).values({
           title,
@@ -79242,6 +79548,7 @@ router13.put("/scraper/items/:id/approve", async (req, res) => {
           category,
           applyLink,
           deadline: normalizedDeadline ?? void 0,
+          structuredData: structuredData ?? null,
           status: "published"
         }).returning({ id: opportunitiesTable.id, slug: opportunitiesTable.slug });
         const existingEvents = item.auditEvents ?? [];
