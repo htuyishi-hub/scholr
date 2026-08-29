@@ -30,7 +30,7 @@ export default function OpportunityTemplate({ opportunity }: { opportunity: any 
   ];
 
   const sections = [
-    opportunity.overview ? { title: "Overview", body: <div className="prose dark:prose-invert max-w-none text-foreground/90" dangerouslySetInnerHTML={{ __html: opportunity.overview.replace(/\n/g, '<br />') }} /> } : null,
+    opportunity.overview ? { title: "Overview", body: <div dangerouslySetInnerHTML={{ __html: opportunity.overview.replace(/\n/g, '<br />') }} /> } : null,
     opportunity.responsibilities?.length ? { title: "What You'll Do", body: renderList(opportunity.responsibilities) } : null,
     opportunity.eligibility?.length ? { title: "Eligibility", body: renderList(opportunity.eligibility) } : null,
     opportunity.requirements?.length ? { title: "Requirements", body: renderList(opportunity.requirements) } : null,
