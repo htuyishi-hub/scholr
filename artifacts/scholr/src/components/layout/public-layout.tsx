@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { MessageCircle, Menu, X, User, GraduationCap, LogOut, Briefcase } from "lucide-react";
+import { MessageCircle, Menu, X, User, GraduationCap, LogOut, Briefcase, Home, Search } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useStudent } from "@/hooks/use-student-auth";
@@ -204,9 +204,14 @@ export function PublicLayout({ children }: { children: ReactNode }) {
           </button>
         </div>
 
+        {/* Mobile Menu Backdrop */}
+        {mobileMenuOpen && (
+          <div className="md:hidden fixed inset-0 top-[72px] z-40 bg-background/80 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+        )}
+
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden absolute top-full left-0 right-0 bg-card border-b border-border shadow-lg py-4 px-4 flex flex-col gap-2">
+          <div className="md:hidden absolute top-full left-0 right-0 z-50 bg-card border-b border-border shadow-lg py-4 px-4 flex flex-col gap-2">
             <Link href="/browse" className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted" onClick={() => setMobileMenuOpen(false)}>Browse Opportunities</Link>
             <Link href="/jobs" className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}><Briefcase size={16} /> Jobs</Link>
             <Link href="/find-my-scholarship" className="text-base font-medium py-2 px-4 rounded-md hover:bg-muted" onClick={() => setMobileMenuOpen(false)}>Find My Match</Link>
@@ -227,7 +232,7 @@ export function PublicLayout({ children }: { children: ReactNode }) {
         )}
       </header>
 
-      <main className="flex-1 pt-24">{children}</main>
+      <main className="flex-1 pt-24 pb-20 md:pb-0">{children}</main>
 
       {/* Footer */}
       <footer className="bg-card border-t border-border pt-16 pb-8 mt-24">
@@ -351,6 +356,25 @@ export function PublicLayout({ children }: { children: ReactNode }) {
       >
         <MessageCircle size={28} />
       </a>
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t border-border z-[100] flex items-center justify-around py-3 px-2 pb-4 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+        <Link href="/" className={`flex flex-col items-center gap-1.5 transition-colors ${location === "/" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+          <Home size={20} />
+          <span className="text-[10px] font-semibold tracking-wide">Home</span>
+        </Link>
+        <Link href="/browse" className={`flex flex-col items-center gap-1.5 transition-colors ${location.startsWith("/browse") || location.startsWith("/find-my-scholarship") ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+          <Search size={20} />
+          <span className="text-[10px] font-semibold tracking-wide">Browse</span>
+        </Link>
+        <Link href="/jobs" className={`flex flex-col items-center gap-1.5 transition-colors ${location.startsWith("/jobs") ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+          <Briefcase size={20} />
+          <span className="text-[10px] font-semibold tracking-wide">Jobs</span>
+        </Link>
+        <Link href={student ? "/dashboard" : "/login"} className={`flex flex-col items-center gap-1.5 transition-colors ${location.startsWith("/dashboard") || location.startsWith("/profile") || location.startsWith("/login") ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+          <User size={20} />
+          <span className="text-[10px] font-semibold tracking-wide">{student ? "Profile" : "Sign In"}</span>
+        </Link>
+      </div>
     </div>
   );
 }

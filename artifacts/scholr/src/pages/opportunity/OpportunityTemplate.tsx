@@ -82,7 +82,7 @@ export default function OpportunityTemplate({ opportunity }: { opportunity: any 
   ];
 
   return (
-    <article className="max-w-4xl mx-auto px-4 py-8">
+    <article className="max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-12">
       <Meta title={`${opportunity.title} | ${opportunity.host?.name || "scholr"}`} description={opportunity.summary} canonical={url} jsonLd={jsonLd} />
       <Breadcrumb items={crumbs} />
       
@@ -119,7 +119,7 @@ export default function OpportunityTemplate({ opportunity }: { opportunity: any 
       {opportunity.applyLink && (
         <div className="mt-16 text-center bg-card border border-border p-8 rounded-2xl shadow-sm">
           <h3 className="text-xl font-bold mb-4">Ready to Apply?</h3>
-          <Button asChild size="lg" className="rounded-xl px-8 h-12 text-base gap-2">
+          <Button asChild size="lg" className="w-full sm:w-auto rounded-xl px-8 h-14 sm:h-12 text-lg sm:text-base gap-2">
             <a href={opportunity.applyLink} target="_blank" rel="noopener noreferrer">
               Apply Now <ExternalLink size={18} />
             </a>

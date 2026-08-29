@@ -162,12 +162,12 @@ export function OpportunityCard({ opp, large = false }: { opp: Opportunity; larg
             )}
           </div>
           <div className="flex gap-2">
-            <Button asChild size="sm" className="flex-1 font-semibold gap-1">
+            <Button asChild className="flex-1 font-semibold gap-1 h-11 sm:h-9">
               <Link href={`/opportunity/${opp.slug}`}>View Details <ArrowRight size={14} /></Link>
             </Button>
-            <Button asChild size="sm" variant="outline" className="border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10">
+            <Button asChild variant="outline" className="h-11 sm:h-9 px-4 border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10">
               <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" data-testid={`btn-whatsapp-${opp.id}`}>
-                <MessageCircle size={14} />
+                <MessageCircle size={18} className="sm:w-4 sm:h-4" />
               </a>
             </Button>
           </div>
@@ -230,12 +230,12 @@ export function OpportunityCard({ opp, large = false }: { opp: Opportunity; larg
         </div>
 
         <div className="flex gap-2">
-          <Button asChild size="sm" className="flex-1 text-xs font-semibold gap-1" data-testid={`btn-apply-${opp.id}`}>
-            <Link href={`/opportunity/${opp.slug}`}>View Details <ArrowRight size={12} /></Link>
+          <Button asChild className="flex-1 text-sm font-semibold gap-1 h-11 sm:h-9" data-testid={`btn-apply-${opp.id}`}>
+            <Link href={`/opportunity/${opp.slug}`}>View Details <ArrowRight size={14} className="sm:w-3 sm:h-3" /></Link>
           </Button>
-          <Button asChild size="sm" variant="outline" className="border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10" data-testid={`btn-whatsapp-card-${opp.id}`}>
+          <Button asChild variant="outline" className="h-11 sm:h-9 px-4 border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10" data-testid={`btn-whatsapp-card-${opp.id}`}>
             <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-              <MessageCircle size={13} />
+              <MessageCircle size={18} className="sm:w-4 sm:h-4" />
             </a>
           </Button>
         </div>
