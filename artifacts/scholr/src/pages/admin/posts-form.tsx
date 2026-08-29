@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import OpportunityTemplate from "../opportunity/OpportunityTemplate";
+import { normalizeOpportunityStructuredData } from "@/lib/opportunity-structure";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -77,6 +79,15 @@ interface FormData {
   notificationDate: string;
   programDuration: string;
   requiredDocuments: string[];
+  responsibilities: string[];
+  eligibility: string[];
+  requirements: string[];
+  benefits: string[];
+  applicationSteps: string[];
+  faq: { question: string; answer: string }[];
+  importantDates: { label: string; date: string; note: string }[];
+  fundingDetails: { status: string; amount: string; currency: string; frequency: string; description: string; };
+  contactDetails: { institution: string; department: string; email: string; };
 }
 
 const INITIAL_FORM: FormData = {
@@ -113,7 +124,59 @@ const INITIAL_FORM: FormData = {
   notificationDate: "",
   programDuration: "",
   requiredDocuments: [],
+  responsibilities: [],
+  eligibility: [],
+  requirements: [],
+  benefits: [],
+  applicationSteps: [],
+  faq: [],
+  importantDates: [],
+  fundingDetails: { status: "", amount: "", currency: "", frequency: "", description: "" },
+  contactDetails: { institution: "", department: "", email: "" },
 };
+
+
+function RepeatableField({ label, items, onChange, placeholder }: { label: string; items: string[]; onChange: (items: string[]) => void; placeholder?: string }) {
+  const [input, setInput] = useState("");
+  return (
+    <div className="space-y-3">
+      <Label className="text-sm font-semibold">{label}</Label>
+      <div className="space-y-2">
+        {items.map((item, i) => (
+          <div key={i} className="flex gap-2 items-center">
+            <Input value={item} onChange={(e) => { const next = [...items]; next[i] = e.target.value; onChange(next); }} className="rounded-xl flex-1 text-sm" />
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0" onClick={() => onChange(items.filter((_, idx) => idx !== i))}><X size={14} /></Button>
+          </div>
+        ))}
+        <div className="flex gap-2">
+          <Input placeholder={placeholder || "Add new item..."} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && input.trim()) { e.preventDefault(); onChange([...items, input.trim()]); setInput(""); } }} className="rounded-xl flex-1 text-sm bg-muted/50" />
+          <Button type="button" variant="secondary" onClick={() => { if (input.trim()) { onChange([...items, input.trim()]); setInput(""); } }} className="rounded-xl shrink-0">Add</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FaqField({ items, onChange }: { items: { question: string; answer: string }[]; onChange: (items: { question: string; answer: string }[]) => void; }) {
+  const addEmpty = () => onChange([...items, { question: "", answer: "" }]);
+  return (
+    <div className="space-y-3">
+      <Label className="text-sm font-semibold">FAQ</Label>
+      <div className="space-y-4">
+        {items.map((item, i) => (
+          <div key={i} className="flex gap-2 items-start bg-muted/30 p-3 rounded-xl border border-border">
+            <div className="flex-1 space-y-2">
+              <Input placeholder="Question" value={item.question} onChange={e => { const next = [...items]; next[i].question = e.target.value; onChange(next); }} className="rounded-xl text-sm font-medium" />
+              <Textarea placeholder="Answer" value={item.answer} onChange={e => { const next = [...items]; next[i].answer = e.target.value; onChange(next); }} className="rounded-xl text-sm resize-none" rows={2} />
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0" onClick={() => onChange(items.filter((_, idx) => idx !== i))}><X size={14} /></Button>
+          </div>
+        ))}
+        <Button type="button" variant="outline" onClick={addEmpty} className="w-full rounded-xl border-dashed"> + Add FAQ Item </Button>
+      </div>
+    </div>
+  );
+}
 
 export function PostsForm({ id }: { id?: string }) {
   const [, setLocation] = useLocation();
@@ -126,6 +189,7 @@ export function PostsForm({ id }: { id?: string }) {
   const [imageUploading, setImageUploading] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
 
   const handleAiGenerate = async () => {
     if (!form.title) { toast({ title: "Add a title first", variant: "destructive" }); return; }
@@ -210,6 +274,15 @@ export function PostsForm({ id }: { id?: string }) {
         notificationDate: (e as any).notificationDate ? String((e as any).notificationDate).slice(0, 10) : "",
         programDuration: String((e as any).programDuration || ""),
         requiredDocuments: Array.isArray((e as any).requiredDocuments) ? ((e as any).requiredDocuments as string[]) : [],
+        responsibilities: (e as any).structuredData?.responsibilities || [],
+        eligibility: (e as any).structuredData?.eligibility || [],
+        requirements: (e as any).structuredData?.requirements || [],
+        benefits: (e as any).structuredData?.benefits || [],
+        applicationSteps: (e as any).structuredData?.applicationSteps || [],
+        faq: (e as any).structuredData?.faq || [],
+        importantDates: (e as any).structuredData?.importantDates || [],
+        fundingDetails: (e as any).structuredData?.funding || { status: "", amount: "", currency: "", frequency: "", description: "" },
+        contactDetails: (e as any).structuredData?.contact || { institution: "", department: "", email: "" },
       });
       setSlugEdited(true);
     }
@@ -288,6 +361,17 @@ export function PostsForm({ id }: { id?: string }) {
       status: (publish ? "published" : form.status) as "published" | "draft" | "archived",
       featured: form.featured,
       pinned: form.pinned,
+      structuredData: {
+        responsibilities: form.responsibilities.length ? form.responsibilities : undefined,
+        eligibility: form.eligibility.length ? form.eligibility : undefined,
+        requirements: form.requirements.length ? form.requirements : undefined,
+        benefits: form.benefits.length ? form.benefits : undefined,
+        applicationSteps: form.applicationSteps.length ? form.applicationSteps : undefined,
+        faq: form.faq.length ? form.faq : undefined,
+        importantDates: form.importantDates.length ? form.importantDates : undefined,
+        funding: form.fundingDetails.status || form.fundingDetails.amount ? form.fundingDetails : undefined,
+        contact: form.contactDetails.email || form.contactDetails.institution ? form.contactDetails : undefined,
+      },
     };
 
     // Advanced fields — only include when set
@@ -336,6 +420,44 @@ export function PostsForm({ id }: { id?: string }) {
 
   const isSaving = createOpp.isPending || updateOpp.isPending;
 
+
+  if (previewMode) {
+    const opp = {
+      title: form.title || "Untitled",
+      slug: form.slug,
+      summary: form.description,
+      overview: form.content, // Fallback
+      responsibilities: form.responsibilities,
+      eligibility: form.eligibility,
+      requirements: form.requirements,
+      benefits: form.benefits,
+      applicationProcess: form.applicationSteps,
+      faq: form.faq,
+      importantDates: form.importantDates,
+      fundingDetails: form.fundingDetails,
+      contact: form.contactDetails,
+      coverImage: form.coverImage,
+      deadline: form.deadline,
+      level: form.studyLevel.join(", "),
+      applyLink: form.applyLink,
+      country: form.country ? { name: form.country } : undefined,
+    };
+    return (
+      <div className="max-w-4xl space-y-6">
+        <div className="flex items-center justify-between mb-4">
+          <Button onClick={() => setPreviewMode(false)} variant="outline" className="rounded-xl gap-2"><ArrowLeft size={16} /> Back to Editor</Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => handleSave(false)} disabled={isSaving || !form.title} variant="outline" className="rounded-xl gap-2">{isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save Draft</Button>
+            <Button onClick={() => handleSave(true)} disabled={isSaving || !form.title} className="rounded-xl gap-2">{isSaving ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />} Publish</Button>
+          </div>
+        </div>
+        <div className="border border-border rounded-2xl bg-background overflow-hidden shadow-sm">
+          <OpportunityTemplate opportunity={opp} />
+        </div>
+      </div>
+    );
+  }
+
   if (isEdit && existingLoading) {
     return (
       <div className="max-w-4xl space-y-6">
@@ -361,6 +483,14 @@ export function PostsForm({ id }: { id?: string }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+                    <Button
+            variant={previewMode ? "default" : "outline"}
+            onClick={() => setPreviewMode(!previewMode)}
+            className="rounded-xl gap-2"
+          >
+            {previewMode ? <EyeOff size={14} /> : <Eye size={14} />}
+            {previewMode ? "Exit Preview" : "Preview"}
+          </Button>
           <Button
             variant="outline"
             onClick={() => handleSave(false)}
@@ -488,9 +618,42 @@ export function PostsForm({ id }: { id?: string }) {
             </div>
           </div>
 
-          {/* Content */}
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-            <Label className="text-base font-semibold">Full Content</Label>
+
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-8">
+            <div>
+              <Label className="text-lg font-bold font-serif mb-4 block">Structured Content</Label>
+              <p className="text-sm text-muted-foreground mb-6">Use these detailed fields instead of the single legacy text block. They will be rendered beautifully in the new template.</p>
+            </div>
+            <RepeatableField label="What You'll Do (Responsibilities)" items={form.responsibilities} onChange={v => setField("responsibilities", v)} />
+            <RepeatableField label="Eligibility" items={form.eligibility} onChange={v => setField("eligibility", v)} />
+            <RepeatableField label="Requirements" items={form.requirements} onChange={v => setField("requirements", v)} />
+            <RepeatableField label="Benefits" items={form.benefits} onChange={v => setField("benefits", v)} />
+            <RepeatableField label="Application Process" items={form.applicationSteps} onChange={v => setField("applicationSteps", v)} />
+            <FaqField items={form.faq} onChange={v => setField("faq", v)} />
+            
+            <div className="space-y-4 pt-4 border-t border-border">
+              <Label className="text-sm font-semibold">Funding Details</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <Input placeholder="Status (e.g. Fully Funded)" value={form.fundingDetails.status} onChange={e => setField("fundingDetails", { ...form.fundingDetails, status: e.target.value })} className="rounded-xl text-sm" />
+                <Input placeholder="Amount (e.g. 2000)" value={form.fundingDetails.amount} onChange={e => setField("fundingDetails", { ...form.fundingDetails, amount: e.target.value })} className="rounded-xl text-sm" />
+                <Input placeholder="Currency (e.g. USD)" value={form.fundingDetails.currency} onChange={e => setField("fundingDetails", { ...form.fundingDetails, currency: e.target.value })} className="rounded-xl text-sm" />
+                <Input placeholder="Frequency (e.g. Monthly)" value={form.fundingDetails.frequency} onChange={e => setField("fundingDetails", { ...form.fundingDetails, frequency: e.target.value })} className="rounded-xl text-sm" />
+              </div>
+              <Input placeholder="Description" value={form.fundingDetails.description} onChange={e => setField("fundingDetails", { ...form.fundingDetails, description: e.target.value })} className="rounded-xl text-sm" />
+            </div>
+            
+            <div className="space-y-4 pt-4 border-t border-border">
+              <Label className="text-sm font-semibold">Contact Info</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <Input placeholder="Institution Name" value={form.contactDetails.institution} onChange={e => setField("contactDetails", { ...form.contactDetails, institution: e.target.value })} className="rounded-xl text-sm" />
+                <Input placeholder="Department" value={form.contactDetails.department} onChange={e => setField("contactDetails", { ...form.contactDetails, department: e.target.value })} className="rounded-xl text-sm" />
+                <Input placeholder="Email Address" value={form.contactDetails.email} onChange={e => setField("contactDetails", { ...form.contactDetails, email: e.target.value })} className="rounded-xl text-sm col-span-2" />
+              </div>
+            </div>
+          </div>
+          {/* Legacy Content */}
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-4 mt-6 opacity-80">
+            <Label className="text-base font-semibold">Advanced / Legacy Markdown Content</Label>
             <p className="text-xs text-muted-foreground">Supports basic markdown: **bold**, - bullet lists, and paragraph breaks.</p>
             <Textarea
               placeholder="Full details, eligibility, benefits, how to apply..."
