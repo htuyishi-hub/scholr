@@ -110,4 +110,8 @@ router.get("/sitemap.xml", async (_req, res) => {
   }
 });
 
+router.get("/ads.txt", (_req, res) => {
+  res.type("text/plain").send("google.com, pub-4809337396875582, DIRECT, f08c47fec0942fa0\n");
+});
+
 export default router;
