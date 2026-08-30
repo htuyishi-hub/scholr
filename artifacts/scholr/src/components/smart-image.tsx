@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { optimizeImageUrl } from "@/lib/utils";
 
 type Fit = "cover" | "contain";
 
@@ -10,6 +11,8 @@ interface SmartImageProps {
   /** "contain" keeps the original framing, "cover" fills the box. */
   fit?: Fit;
   eager?: boolean;
+  /** "hero" ensures a large 1200px+ image for Google Discover and visual quality. "card" uses a smaller 600px image for performance. */
+  variant?: "hero" | "card";
   /** Rendered when there is no image or the image fails to load. */
   fallback?: React.ReactNode;
 }
@@ -31,12 +34,16 @@ export function SmartImage({
   className = "",
   fit = "contain",
   eager = false,
+  variant = "card",
   fallback,
 }: SmartImageProps) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  if (!src || failed) {
+  // Hero images need high resolution (1200px) for Google Discover eligibility. Cards can be smaller (600px).
+  const optimizedSrc = optimizeImageUrl(src, variant === "hero" ? 1200 : 600);
+
+  if (!optimizedSrc || failed) {
     return (
       <div className={`bg-gradient-to-br from-primary/15 via-card to-card ${className}`}>
         {fallback}
@@ -48,7 +55,7 @@ export function SmartImage({
     <div className={`relative overflow-hidden bg-muted ${className}`}>
       {fit === "contain" && (
         <img
-          src={src}
+          src={optimizedSrc}
           alt=""
           width={1280}
           height={720}
@@ -60,7 +67,7 @@ export function SmartImage({
         />
       )}
       <img
-        src={src}
+        src={optimizedSrc}
         alt={alt}
         width={1280}
         height={720}

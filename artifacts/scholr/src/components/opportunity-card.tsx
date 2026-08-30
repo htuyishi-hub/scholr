@@ -129,7 +129,7 @@ export function OpportunityCard({ opp, large = false }: { opp: Opportunity; larg
       >
         <Link href={`/opportunity/${opp.slug}`}>
           <div className="relative h-72 overflow-hidden">
-            <SmartImage src={opp.coverImage} alt={opp.title} className="h-full w-full" fit="contain" />
+            <SmartImage src={opp.coverImage} alt={opp.title} className="h-full w-full" fit="contain" eager={true} />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/85 via-black/45 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-6">
               <div className="flex flex-wrap gap-2 mb-3">

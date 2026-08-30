@@ -4,6 +4,7 @@ import Breadcrumb, { breadcrumbJsonLd } from "../../components/Breadcrumb";
 import QuickFacts from "../../components/QuickFacts";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
+import { SmartImage } from "@/components/smart-image";
 
 function renderList(items: Array<string | { question?: string; answer?: string }> | undefined | null) {
   if (!items || items.length === 0) return null;
@@ -89,7 +90,7 @@ export default function OpportunityTemplate({ opportunity }: { opportunity: any 
       {/* Hero */}
       {opportunity.coverImage && (
         <div className="w-full h-64 md:h-96 rounded-2xl overflow-hidden mb-8 mt-4">
-          <img src={opportunity.coverImage} alt={opportunity.title} className="w-full h-full object-cover" />
+          <SmartImage src={opportunity.coverImage} alt={opportunity.title} eager={true} variant="hero" fit="cover" className="w-full h-full" />
         </div>
       )}
       <h1 className="text-3xl md:text-5xl font-serif font-bold text-foreground mt-4 mb-6">{opportunity.title}</h1>

@@ -22,3 +22,10 @@ export function convertGoogleDriveLink(url: string | null | undefined): string {
 
   return url;
 }
+export function optimizeImageUrl(url: string | null | undefined, width: number = 800): string {
+  if (!url) return "";
+  if (url.includes("drive.google.com/thumbnail") && url.includes("sz=w")) {
+    return url.replace(/sz=w\d+/, `sz=w${width}`);
+  }
+  return url;
+}
